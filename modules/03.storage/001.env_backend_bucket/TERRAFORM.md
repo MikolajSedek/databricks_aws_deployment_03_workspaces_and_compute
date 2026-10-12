@@ -41,5 +41,8 @@ No modules.
 
 ## Outputs
 
-No outputs.
+| Name | Description |
+|------|-------------|
+| <a name="output_bucket_arn"></a> [bucket\_arn](#output\_bucket\_arn) | The ARN of the remote state backend S3 bucket. |
+| <a name="output_bucket_name"></a> [bucket\_name](#output\_bucket\_name) | The name of the remote state backend S3 bucket. |
 <!-- END_TF_DOCS -->

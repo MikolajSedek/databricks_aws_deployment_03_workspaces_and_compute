@@ -1,268 +1,210 @@
-# Databricks Identity Management - Dev Environment (`environments/dev`)
+# Databricks Multi-Workspace and Compute Management - Dev Environment (`environments/dev`)
 
 [![Terraform](https://img.shields.io/badge/Terraform-%3E%3D1.5.0-623CE4?logo=terraform)](https://developer.hashicorp.com/terraform/docs)
-[![AWS Provider](https://img.shields.io/badge/AWS_Provider-6.66.0-FF9900?logo=amazon-aws)](https://registry.terraform.io/providers/hashicorp/aws/latest/docs)
-[![Databricks Provider](https://img.shields.io/badge/Databricks_Provider-1.135.0-FF3621?logo=databricks)](https://registry.terraform.io/providers/databricks/databricks/latest/docs)
-[![Databricks](https://img.shields.io/badge/Databricks-Account_Level-FF3621?logo=databricks)](https://docs.databricks.com/aws/en/admin/users-groups/)
+[![AWS Provider](https://img.shields.io/badge/AWS_Provider-%3E%3D5.0-FF9900?logo=amazon-aws)](https://registry.terraform.io/providers/hashicorp/aws/latest/docs)
+[![Databricks Provider](https://img.shields.io/badge/Databricks_Provider-%3E%3D1.135.0-FF3621?logo=databricks)](https://registry.terraform.io/providers/databricks/databricks/latest/docs)
+[![Time Provider](https://img.shields.io/badge/Time_Provider-%3E%3D0.9.0-623CE4?logo=terraform)](https://registry.terraform.io/providers/hashicorp/time/latest/docs)
 
 ---
 
 ## 1. Executive Summary
 
 - **Purpose & Scope**:
-  This environment orchestrates the core account-level identity governance model and remote state foundation for Databricks on AWS in the `dev` environment. It provisions customer-managed encryption (KMS CMK), a versioned S3 backend bucket, and an end-to-end identity fabric comprising users, functional groups, administrative role grants, service principals, multi-entity group memberships, and authoritative access control rule sets.
+  This environment orchestrates the complete end-to-end provisioning of dedicated Databricks workspaces and governed compute infrastructure for **Data Engineering**, **Data Science**, and **Data Analytics** personas in the `dev` environment. It builds on the networking foundation established in project `01_setup_vpc_networking` and the account identity governance established in project `02_setup_identity_management`.
 - **Problem Statement & Solution**:
-  Ad-hoc console modifications and fragmented identity provisioning lead to unauthorized privilege escalation, non-reproducible environments, and auditing deficiencies. This environment solves this problem by defining the complete Databricks account identity catalogue in code (`locals.tf` and parameterized variables), ensuring consistent deployment, peer-reviewed modifications, and automated governance.
+  Deploying multiple Databricks workspaces in an enterprise environment requires orchestrating account-level resources (cross-account IAM roles, PrivateLink endpoints, S3 root storage, KMS customer-managed keys) before workspace-level compute engines can be launched. This environment solves this dependency sequencing by separating deployment into an account-level foundation phase and a workspace-level compute governance phase.
 - **Key Business & Security Outcomes**:
-  - **Single Source of Truth**: All identities, group memberships, and service principal delegations are declared centrally in `locals.tf`.
-  - **Zero Direct-to-User Privilege**: All workspace and service principal privileges are conferred strictly through group memberships.
-  - **Authoritative Service Principal Protection**: Machine identities are guarded by access control rule sets that prevent out-of-band credential tampering.
-  - **At-Rest State Protection**: State files are safeguarded by a dedicated, customer-managed KMS key and a private, versioned S3 bucket.
+  - **AWS & Account Foundation**: Dedicated cross-account IAM role with AWS STS propagation protection, AWS PrivateLink interface endpoints for Workspace REST and SCC Relay traffic, and Databricks MWS network configuration.
+  - **Isolated Storage**: Dedicated Amazon S3 root storage buckets per workspace, each encrypted with an independent customer-managed KMS key and registered with Databricks MWS.
+  - **Multi-Workspace Fabric**: Discrete Databricks workspaces for `data_engineering`, `data_science`, and `data_analytics` personas with authoritative access assignments.
+  - **Strict Compute Governance**: Enforced cluster policies—including a Platform Admin policy capped at **maximum 10 DBUs/hr**—ensuring no unconstrained clusters can be launched.
+  - **Configured Workloads**: Automated autoscaling compute clusters and cost-optimized SQL Warehouses orchestrated via a single composite module instantiated per workspace.
 
 ---
 
 ## 2. General Logic & Operational Flow
 
-### 2.1 Configuration & Provisioning Lifecycle
-1. **Security & Storage Initialization**:
-   - Deploys customer-managed KMS key [`001.kms_key`](file:///modules/02.security/001.kms_key).
-   - Deploys S3 remote backend bucket [`001.env_backend_bucket`](file:///modules/03.storage/001.env_backend_bucket) encrypted with the KMS CMK.
-2. **Identity Catalogue Definition (`locals.tf`)**:
-   - Maps users (`user1`, `user2`) parameterized via sensitive email variables.
-   - Declares groups (`platform_admins` with `account_admin = true`, `data_engineers`, `data_scientists`, `data_analysts`).
-   - Declares workload service principals (`terraform_automation`, `etl_pipelines`, `data_science`).
-   - Defines group memberships and service principal role delegations.
-3. **Core Identity Provisioning**:
-   - Concurrently provisions [`001.users`](file:///modules/04.identity_management/001.users), [`002.groups`](file:///modules/04.identity_management/002.groups), and [`003.service_principals`](file:///modules/04.identity_management/003.service_principals) using the account-level provider alias (`databricks.mws`).
-4. **Relationship & Entitlement Binding**:
-   - Passes resolved IDs to [`004.group_memberships`](file:///modules/04.identity_management/004.group_memberships) to associate users and service principals with groups.
-   - Passes application IDs and group ACL principal strings to [`005.service_principal_group_management`](file:///modules/04.identity_management/005.service_principal_group_management) to establish authoritative access control rule sets.
+### 2.1 Configuration & Dependency Lifecycle
 
-### 2.2 Authentication & API Flow
-- **AWS Provider**: Authenticates using the configured AWS profile and limits execution to `var.aws_account_id` to prevent cross-account deployment.
-- **Databricks Provider (`databricks.mws`)**: Authenticates against `https://accounts.cloud.databricks.com` via OAuth M2M credentials (`service_principal_id` and sensitive `service_principal_secret`).
+```text
+Project 01 (Spoke VPC, Subnets, SG)  ──>  AWS Data Lookups (data.tf)
+Project 02 (Account Groups)          ──>  Databricks Data Lookups (data.tf)
+                                                │
+                                                ▼
+         ┌──────────────────────────────────────────────────────────────┐
+         │              Phase 1: Foundation (Account Plane)             │
+         │  - S3 Backend & KMS Key                                      │
+         │  - Cross-Account IAM Role (with 30s sleep)                   │
+         │  - PrivateLink VPC Endpoints & MWS Network                   │
+         │  - Dedicated Workspace KMS Keys & Root S3 Buckets            │
+         │  - Generic MWS Workspaces & Group Role Assignments           │
+         └──────────────────────────────┬───────────────────────────────┘
+                                        │ (Workspace URLs Generated)
+                                        ▼
+         ┌──────────────────────────────────────────────────────────────┐
+         │              Phase 2: Compute Governance (Workspace Plane)   │
+         │  Composite Module: 004.workspace_compute (Instantiated 3x)   │
+         │  - Compute Policies (Admin <=10 DBU, DE, DS, DA)             │
+         │  - All-Purpose Compute Clusters (tied to policy IDs)         │
+         │  - SQL Warehouses (with inactivity auto-stop)                │
+         └──────────────────────────────────────────────────────────────┘
+```
 
----
-
-## 3. Architecture of the Environment
-
-### 3.1 Identity Model Catalogue
-
-| Identity / Component | Category | Attributes & Configuration | Operational Purpose |
-|:---|:---|:---|:---|
-| `user1` | User | Email: `var.user1_email`, Display Name: `User1Admin` | Lead platform operator |
-| `user2` | User | Email: `var.user2_email`, Display Name: `User2` | Data team engineer |
-| `platform_admins` | Group | `account_admin = true` | Databricks account administration |
-| `data_engineers` | Group | Standard group | Data pipeline operations & development |
-| `data_scientists` | Group | Standard group | Machine learning experimentation |
-| `data_analysts` | Group | Standard group | BI & analytical reporting |
-| `terraform_automation` | Service Principal | `sp-terraform-automation-dev` | CI/CD IaC execution |
-| `etl_pipelines` | Service Principal | `sp-etl-pipelines-dev` | Scheduled data pipelines |
-| `data_science` | Service Principal | `sp-data-science-dev` | Model training & deployment jobs |
-
-### 3.2 Access & Entitlement Matrix
-
-| Target Entity | Entitlement / Role | Granted To Groups | Description |
-|:---|:---|:---|:---|
-| **Account System** | `account_admin` | `platform_admins` | Full account administrative privileges |
-| **`terraform_automation`** | `roles/servicePrincipal.manager` | `platform_admins` | Manage credentials and settings |
-| **`terraform_automation`** | `roles/servicePrincipal.user` | `data_engineers` | Run workflows as the service principal |
-| **`etl_pipelines`** | `roles/servicePrincipal.manager` | `platform_admins` | Manage credentials and settings |
-| **`etl_pipelines`** | `roles/servicePrincipal.user` | `data_engineers` | Trigger automated ETL runs |
-| **`data_science`** | `roles/servicePrincipal.manager` | `platform_admins` | Manage credentials and settings |
-| **`data_science`** | `roles/servicePrincipal.user` | `data_scientists` | Execute ML models as the service principal |
-
-### 3.3 Security, IAM & Encryption Posture
-- **State Security**: Remote state is stored in a private S3 bucket with customer-managed KMS key encryption, enforced bucket ownership, and versioning.
-- **Secret Isolation**: OAuth client secrets and user email addresses are marked `sensitive = true`, preventing plaintext exposure in console logs.
-- **Authoritative Rule Sets**: Service principal permissions overwrite out-of-band grants, maintaining deterministic state.
+### 2.2 Network & Traffic Flow
+- **Outbound Egress (Databricks Clusters -> SCC Relay)**:
+  `[Databricks Compute Cluster]` $\rightarrow$ `[Private Subnet]` $\rightarrow$ `[AWS Interface VPCE: backend_relay]` $\rightarrow$ `[Databricks Control Plane (Port 6666)]`.
+- **REST API Management**:
+  `[Terraform / Developer]` $\rightarrow$ `[AWS Interface VPCE: backend_rest]` $\rightarrow$ `[Databricks Control Plane (Port 443)]`.
+- **Data Storage**:
+  `[Compute Clusters]` $\rightarrow$ `[AWS S3 Root Bucket]` $\rightarrow$ `[SSE-KMS Encryption]`.
 
 ---
 
-## 4. Architecture C4 Visualisation
+## 3. Architecture of the Dev Environment
+
+### 3.1 Network Topology & Integration
+This environment imports existing network infrastructure provisioned by project `01_setup_vpc_networking`:
+
+| Resource Type | Source | Purpose |
+|:---|:---|:---|
+| `vpc_id` | `data.aws_vpc.spoke` | Customer-managed Spoke VPC |
+| `subnet_ids` | `data.aws_subnets.private_compute` | Private compute subnets across Availability Zones |
+| `security_group_ids` | `data.aws_security_group.cluster_shared` | Databricks cluster inter-node security group |
+
+### 3.2 Security, IAM & Encryption Posture
+- **Encryption at Rest**:
+  - Remote state bucket encrypted with dedicated KMS CMK (`alias/terraform-state-backend-03-dev`).
+  - Each workspace has a dedicated KMS CMK (`alias/dbx-workspace-${workspace_name}-dev`) with automatic annual key rotation and root account delegation.
+- **Cross-Account Access**:
+  - Dedicated IAM role assumed by Databricks Account (`414351767826`) with conditional External ID verification matching the Databricks Account ID.
+  - 30-second sleep buffer to prevent STS eventual consistency race conditions during MWS registration.
+
+---
+
+## 4. Architecture C4 Visualisations
 
 ### 4.1 Level 1: System Context Diagram
 
 ```mermaid
 flowchart TD
     classDef actor fill:#232F3E,stroke:#FF9900,stroke-width:2px,color:#FFFFFF;
-    classDef system fill:#1E88E5,stroke:#0D47A1,stroke-width:2px,color:#FFFFFF;
-    classDef external fill:#546E7A,stroke:#263238,stroke-width:2px,color:#FFFFFF;
+    classDef databricks fill:#FF3621,stroke:#B71C1C,stroke-width:2px,color:#FFFFFF;
+    classDef aws fill:#1E88E5,stroke:#0D47A1,stroke-width:2px,color:#FFFFFF;
+    classDef workspace fill:#E8F5E9,stroke:#2E7D32,stroke-width:2px,color:#1B5E20;
 
     Admin["Platform Administrator"]:::actor
-    AccountAPI["Databricks Account API (SCIM & RuleSets)"]:::external
-    AWSStorage["AWS S3 & KMS (State Foundation)"]:::external
-    Workspaces["Databricks Workspaces (E2)"]:::external
+    Users["Data Engineers / Scientists / Analysts"]:::actor
 
-    subgraph DevEnvironment ["Terraform Environment: dev"]
-        Orchestration["Dev Identity Management Orchestration"]:::system
+    subgraph DatabricksSaaS ["Databricks E2 SaaS Platform"]
+        MWS["Databricks MWS Console"]:::databricks
+        CP["Databricks Control Plane (REST & SCC Relay)"]:::databricks
     end
 
-    Admin -->|"terraform plan / apply"| Orchestration
-    Orchestration -->|"KMS SSE & Versioned State"| AWSStorage
-    Orchestration -->|"HTTPS/443 (OAuth M2M)"| AccountAPI
-    AccountAPI -->|"Federated Identities"| Workspaces
+    subgraph AWSAccount ["AWS Account (dev)"]
+        subgraph Foundations ["Foundational Infrastructure"]
+            IAM["Cross-Account IAM Role"]:::aws
+            VPCE["PrivateLink VPCEs"]:::aws
+            S3["Root S3 Buckets & KMS CMKs"]:::aws
+        end
+
+        subgraph Workspaces ["Workspaces Fabric"]
+            WS_DE["Workspace: Data Engineering"]:::workspace
+            WS_DS["Workspace: Data Science"]:::workspace
+            WS_DA["Workspace: Data Analytics"]:::workspace
+        end
+    end
+
+    Admin -->|"MWS Governance"| MWS
+    Users -->|"Workspace Analytics"| Workspaces
+    MWS -->|"Assumes Role"| IAM
+    CP <-->|"PrivateLink (443 & 6666)"| VPCE
+    VPCE --> Workspaces
+    S3 --> Workspaces
 ```
 
-### 4.2 Level 2: Container / Infrastructure Diagram
+### 4.2 Level 2: Component Architecture Diagram
 
 ```mermaid
-flowchart LR
-    classDef state fill:#E8F5E9,stroke:#2E7D32,stroke-width:2px,color:#1B5E20;
-    classDef idModule fill:#E3F2FD,stroke:#1565C0,stroke-width:2px,color:#0D47A1;
-    classDef dbx fill:#FFF3E0,stroke:#E65100,stroke-width:2px,color:#BF360C;
+flowchart TD
+    classDef infra fill:#E3F2FD,stroke:#1565C0,stroke-width:2px,color:#0D47A1;
+    classDef compute fill:#FFF3E0,stroke:#E65100,stroke-width:2px,color:#BF360C;
+    classDef policy fill:#F3E5F5,stroke:#4A148C,stroke-width:2px,color:#311B92;
 
-    subgraph AWSAccount ["AWS Account (Storage & Security)"]
-        KMS["001.kms_key (CMK)"]:::state
-        S3Bucket["001.env_backend_bucket"]:::state
+    subgraph DevEnv ["environments/dev"]
+        subgraph Stage1Modules ["Stage 1: Foundation Modules"]
+            KmsKey["001.kms_key"]:::infra
+            CrossAccount["002.cross_account_role"]:::infra
+            Networking["006.databricks_mws_networking"]:::infra
+            RootBuckets["002.databricks_root_bucket (3x)"]:::infra
+            WorkspacesMod["001.generic_workspace (3x)"]:::infra
+        end
+
+        subgraph Stage2Modules ["Stage 2: Compute Governance Modules"]
+            subgraph CompositeCompute ["004.workspace_compute (Instantiated 3x)"]
+                Policies["001.compute_policies"]:::policy
+                Clusters["002.all_purpose_cluster"]:::compute
+                SQLWarehouses["003.sql_warehouse"]:::compute
+            end
+        end
+
+        CrossAccount --> WorkspacesMod
+        Networking --> WorkspacesMod
+        RootBuckets --> WorkspacesMod
+        WorkspacesMod -->|"workspace_url"| CompositeCompute
     end
-
-    subgraph DatabricksModules ["Databricks Identity Modules"]
-        CoreIds["001.users, 002.groups, 003.service_principals"]:::idModule
-        Memberships["004.group_memberships"]:::idModule
-        SpMgmt["005.service_principal_group_management"]:::idModule
-    end
-
-    subgraph DatabricksAccount ["Databricks Account Console"]
-        Directory["Account Directory (SCIM)"]:::dbx
-        RuleSets["Access Control Rule Sets"]:::dbx
-    end
-
-    KMS -->|"KMS Key ARN"| S3Bucket
-    CoreIds --> Memberships
-    CoreIds --> SpMgmt
-    Memberships --> Directory
-    SpMgmt --> RuleSets
-```
-
-### 4.3 Level 3: Component Diagram (Terraform Resource Orchestration)
-
-```mermaid
-graph TD
-    classDef envRoot fill:#ECEFF1,stroke:#37474F,stroke-width:2px,color:#212121;
-    classDef secModule fill:#FFF8E1,stroke:#F57F17,stroke-width:1.5px,color:#E65100;
-    classDef idModule fill:#E1F5FE,stroke:#0288D1,stroke-width:1.5px,color:#01579B;
-
-    DevRoot["environments/dev/main.tf"]:::envRoot
-    KmsMod["02.security/001.kms_key"]:::secModule
-    BucketMod["03.storage/001.env_backend_bucket"]:::secModule
-    UsersMod["04.identity_management/001.users"]:::idModule
-    GroupsMod["04.identity_management/002.groups"]:::idModule
-    SpMod["04.identity_management/003.service_principals"]:::idModule
-    MemberMod["04.identity_management/004.group_memberships"]:::idModule
-    SpMgmtMod["04.identity_management/005.service_principal_group_management"]:::idModule
-
-    DevRoot --> KmsMod
-    DevRoot --> BucketMod
-    DevRoot --> UsersMod
-    DevRoot --> GroupsMod
-    DevRoot --> SpMod
-    DevRoot --> MemberMod
-    DevRoot --> SpMgmtMod
-
-    KmsMod -.->|"kms_arn"| BucketMod
-    UsersMod -.->|"ids"| MemberMod
-    GroupsMod -.->|"ids"| MemberMod
-    SpMod -.->|"ids"| MemberMod
-    GroupsMod -.->|"acl_principal_ids"| SpMgmtMod
-    SpMod -.->|"application_ids"| SpMgmtMod
 ```
 
 ---
 
-## 5. All Modules Used with Short Summaries
+## 5. Provisioning Sequence & Staged Rollout
 
-### 5.1 Module Inventory Table
+Because workspace-scoped providers require live workspace URLs determined during workspace creation, initial deployment follows a two-stage apply sequence:
 
-| Module Name | Source Path | Version / Ref | Primary Role / Responsibility |
-|:---|:---|:---:|:---|
-| `kms_key` | `../../modules/02.security/001.kms_key` | `n/a` | Provisions customer-managed KMS key for state encryption |
-| `backend_bucket` | `../../modules/03.storage/001.env_backend_bucket` | `n/a` | Deploys encrypted, versioned S3 bucket for Terraform state storage |
-| `users` | `../../modules/04.identity_management/001.users` | `n/a` | Provisions account-level Databricks users via SCIM |
-| `groups` | `../../modules/04.identity_management/002.groups` | `n/a` | Provisions account groups and binds `account_admin` system role |
-| `service_principals` | `../../modules/04.identity_management/003.service_principals` | `n/a` | Deploys workload service principals and captures application IDs |
-| `group_memberships` | `../../modules/04.identity_management/004.group_memberships` | `n/a` | Binds users, service principals, and nested groups into target groups |
-| `service_principal_group_management` | `../../modules/04.identity_management/005.service_principal_group_management` | `n/a` | Configures authoritative access rule sets on service principals |
+### Stage 1: Foundation Deployment (Account Plane)
+Provisions the state backend, cross-account credentials, PrivateLink networking, root storage, and creates the Databricks workspaces:
 
-### 5.2 Deep-Dive Module Summaries
+```bash
+terraform init
+terraform apply \
+  -target="module.kms_key" \
+  -target="module.backend_bucket" \
+  -target="module.cross_account_role" \
+  -target="module.mws_networking" \
+  -target="module.workspace_kms_keys" \
+  -target="module.root_buckets" \
+  -target="module.workspaces"
+```
 
-#### 1. `001.kms_key`
-- **Source**: `../../modules/02.security/001.kms_key`
-- **Purpose**: Creates the root cryptographic key with annual rotation and root account delegation policy.
-- **Key Exposed Outputs**: `kms_arn`.
+### Stage 2: Compute & Policies Convergence (Workspace Plane)
+Deploys the scoped cluster policies, compute clusters, SQL Warehouses, and object access control lists:
 
-#### 2. `001.env_backend_bucket`
-- **Source**: `../../modules/03.storage/001.env_backend_bucket`
-- **Purpose**: Creates the private, versioned S3 backend storage bucket with SSE-KMS and 90-day version lifecycle expiration.
-- **Key Exposed Outputs**: None (managed internally).
-
-#### 3. `001.users`
-- **Source**: `../../modules/04.identity_management/001.users`
-- **Purpose**: Instantiates account users with email validation and unique display names.
-- **Key Exposed Outputs**: `ids`.
-
-#### 4. `002.groups`
-- **Source**: `../../modules/04.identity_management/002.groups`
-- **Purpose**: Deploys RBAC groups and attaches the `account_admin` system role to `platform_admins`.
-- **Key Exposed Outputs**: `ids`, `acl_principal_ids`.
-
-#### 5. `003.service_principals`
-- **Source**: `../../modules/04.identity_management/003.service_principals`
-- **Purpose**: Provisions machine identities for automated CI/CD and data pipeline workloads.
-- **Key Exposed Outputs**: `ids`, `application_ids`.
-
-#### 6. `004.group_memberships`
-- **Source**: `../../modules/04.identity_management/004.group_memberships`
-- **Purpose**: Flattens and validates group membership links across users and service principals.
-- **Key Exposed Outputs**: None.
-
-#### 7. `005.service_principal_group_management`
-- **Source**: `../../modules/04.identity_management/005.service_principal_group_management`
-- **Purpose**: Applies authoritative default rule sets granting Manager and User roles to specific groups.
-- **Key Exposed Outputs**: None.
+```bash
+terraform apply
+```
 
 ---
 
-## 6. Terraform Documentation Interface
+## 6. Compute Policy Governance Matrix
 
-> [!NOTE]
-> Detailed interface contracts for this environment are maintained by `terraform-docs` in [`TERRAFORM.md`](./TERRAFORM.md).
-
-### 6.1 Essential Inputs Summary
-
-| Variable | Type | Description | Sample / Constraint |
-|:---|:---:|:---|:---|
-| `aws_account_id` | `string` | Target 12-digit AWS Account ID | `"123456789012"` |
-| `aws_region` | `string` | Deployment AWS region | `"eu-central-1"` |
-| `environment` | `string` | Target environment qualifier | `"dev"` |
-| `profile` | `string` | AWS CLI local profile | `"default"` |
-| `databricks_account_id` | `string` | Databricks account UUID | Valid UUID |
-| `service_principal_id` | `string` | Admin OAuth service principal client ID | OAuth client ID |
-| `service_principal_secret` | `string` | Admin OAuth service principal secret (sensitive) | Sensitive string |
-| `user1_email` | `string` | Email address for lead administrator user | Valid RFC email |
-| `user2_email` | `string` | Email address for engineering user | Valid RFC email |
-
-### 6.2 Essential Outputs Summary
-
-This root environment configuration does not export Terraform outputs. State is stored remotely in S3, and identities are active within the Databricks Account console.
+| Persona / Policy | Target Workspace | Core Constraints | Group Permissions |
+|:---|:---|:---|:---|
+| **Platform Admin** | All Workspaces | **Max 10 DBUs/hr cap**, max 4 workers, cost-efficient nodes (`m5.large`, `m5.xlarge`, `c5.xlarge`), max 45 min idle timeout | `CAN_USE` for `dbx-platform-admins` |
+| **Data Engineering** | `data_engineering` | Auto-scaling 1–4 nodes, max 30 min idle timeout, ETL-ready compute | `CAN_USE` for `dbx-data-engineers` |
+| **Data Science** | `data_science` | Single-user security mode, ML runtimes, GPU/CPU instances, max 20 min idle timeout | `CAN_USE` for `dbx-data-scientists` |
+| **Data Analytics** | `data_analytics` | Single-node compute only (0 workers), max 15 min idle timeout | `CAN_USE` for `dbx-data-analysts` |
 
 ---
 
-## 7. Important Links and Resources
+## 7. Module Inventory & References
 
-### 7.1 Authoritative Databricks Documentation
-- [Databricks on AWS Official Documentation](https://docs.databricks.com/aws/en/) - Core platform documentation.
-- [Manage users, service principals, and groups](https://docs.databricks.com/aws/en/admin/users-groups/) - Identity management concepts.
-- [Manage groups](https://docs.databricks.com/aws/en/admin/users-groups/groups) - Group governance guide.
-- [Manage service principals](https://docs.databricks.com/aws/en/admin/users-groups/service-principals) - Service principal management guide.
-- [Databricks Terraform Provider Documentation](https://registry.terraform.io/providers/databricks/databricks/latest/docs) - Provider guide.
-
-### 7.2 Terraform & Tooling Documentation
-- [Terraform Language Documentation](https://developer.hashicorp.com/terraform/docs) - HCL syntax and expressions.
-- [terraform-docs Documentation](https://terraform-docs.io/) - Automated interface generation tool.
-
-### 7.3 Internal Repository References
-- [Terraform Interface (`TERRAFORM.md`)](./TERRAFORM.md) - Interface documentation.
-- [Root Repository README](../../README.md) - Global architecture overview.
-- [Project Instructions & Source of Truth](file:///.ai/instructions.md) - Repository governance.
-- [Authoritative README Template](file:///.ai/README_TEMPLATE.md) - Documentation standard.
+- [`02.security/001.kms_key`](file:///modules/02.security/001.kms_key): Customer-managed KMS key for state and root storage encryption.
+- [`02.security/002.cross_account_role`](file:///modules/02.security/002.cross_account_role): Databricks AWS cross-account role using official assume and cross-account policies with STS propagation protection.
+- [`01.networking/006.databricks_mws_networking`](file:///modules/01.networking/006.databricks_mws_networking): AWS PrivateLink VPCEs, PAS, and Databricks network registration.
+- [`03.storage/001.env_backend_bucket`](file:///modules/03.storage/001.env_backend_bucket): Secure S3 remote state storage bucket.
+- [`03.storage/002.databricks_root_bucket`](file:///modules/03.storage/002.databricks_root_bucket): S3 root storage bucket using `databricks_aws_bucket_policy`, dynamic KMS grants, and MWS storage config.
+- [`04.workspaces/001.generic_workspace`](file:///modules/04.workspaces/001.generic_workspace): Generic workspace creation and account group permission assignments.
+- [`05.compute/001.compute_policies`](file:///modules/05.compute/001.compute_policies): Granular compute policies and policy ACLs.
+- [`05.compute/002.all_purpose_cluster`](file:///modules/05.compute/002.all_purpose_cluster): Policy-enforced autoscaling clusters.
+- [`05.compute/003.sql_warehouse`](file:///modules/05.compute/003.sql_warehouse): Auto-stopping BI SQL Warehouses.
+- [`05.compute/004.workspace_compute`](file:///modules/05.compute/004.workspace_compute): Composite workspace compute module unifying policies, clusters, and warehouses into a single instantiation.
+- [Terraform Documentation Interface (`TERRAFORM.md`)](./TERRAFORM.md): Machine-generated documentation of all inputs, outputs, and provider dependencies.

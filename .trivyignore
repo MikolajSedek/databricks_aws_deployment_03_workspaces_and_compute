@@ -20,3 +20,12 @@
 #   1. <Detailed justification explaining why this check is exempted>
 # <AVD-AWS-XXXX>
 # ==============================================================================
+
+# Rule ID:     AVD-AWS-0104
+# Description: Security group rule allows unrestricted egress to any IP address.
+# Severity:    CRITICAL
+# Target:      modules/01.networking/006.databricks_mws_networking/main.tf (aws_security_group.privatelink_vpce_sg)
+# Justification:
+#   1. Databricks PrivateLink interface VPC endpoint security group outbound traffic rule.
+AVD-AWS-0104
+AWS-0104
