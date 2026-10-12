@@ -4,7 +4,7 @@
     - https://registry.terraform.io/providers/databricks/databricks/latest/docs
 
   Aggregates and orchestrates:
-    - Compute policies (including max 10 DBU admin policy and persona policy)
+    - Compute policies (including max 25 DBU admin policy and persona policy)
     - Multiple all-purpose compute clusters governed by the persona policy
     - Multiple SQL Warehouses governed by role-based ACLs
 */

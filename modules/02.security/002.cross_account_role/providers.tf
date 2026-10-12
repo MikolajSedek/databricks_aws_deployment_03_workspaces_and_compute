@@ -1,3 +1,13 @@
+/*
+  Terraform, AWS, Databricks, and Time Provider Configuration - Cross-Account Role Module
+  Documentation:
+    - https://registry.terraform.io/providers/hashicorp/aws/latest/docs
+    - https://registry.terraform.io/providers/databricks/databricks/latest/docs
+    - https://registry.terraform.io/providers/hashicorp/time/latest/docs
+
+  Declares required Terraform version, AWS provider, Databricks MWS alias provider, and Time provider constraints.
+*/
+
 terraform {
   required_version = ">= 1.5.0"
 

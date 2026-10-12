@@ -6,25 +6,47 @@
     - https://registry.terraform.io/providers/databricks/databricks/latest/docs/resources/permissions
 */
 
-/* 1. Platform Admin Compute Policy (Strictly capped at max 10 DBUs / node budget) */
+/* 1. Platform Admin Compute Policy (Strictly capped at max 25 DBUs / hour) */
 resource "databricks_cluster_policy" "admin_policy" {
-  name = "Platform Admin Capped Policy (Max 10 DBU)"
+  name = "Platform Admin Capped Policy (Max 25 DBU)"
 
   definition = jsonencode({
     "dbus_per_hour" = {
-      "type"         = "range"
-      "maxValue"     = 10
-      "defaultValue" = 8
+      "type"     = "range"
+      "maxValue" = 25
     }
     "autoscale.max_workers" = {
       "type"         = "range"
       "maxValue"     = 4
       "defaultValue" = 2
     }
-    "node_type_id" = {
+    "runtime_engine" = {
       "type"         = "allowlist"
-      "values"       = ["m5.large", "m5.xlarge", "c5.xlarge"]
-      "defaultValue" = "m5.large"
+      "values"       = ["PHOTON", "STANDARD"]
+      "defaultValue" = "PHOTON"
+    }
+    "node_type_id" = {
+      "type" = "allowlist"
+      "values" = [
+        "m5.large",
+        "m5.xlarge",
+        "m5.2xlarge",
+        "c5.xlarge",
+        "c5.2xlarge",
+        "r5.xlarge",
+        "r5.2xlarge"
+      ]
+      "defaultValue" = "m5.xlarge"
+    }
+    "spark_version" = {
+      "type" = "allowlist"
+      "values" = [
+        "auto:latest-lts",
+        "auto:prev-lts",
+        "auto:latest",
+        "auto:prev-major"
+      ]
+      "defaultValue" = "auto:latest-lts"
     }
     "autotermination_minutes" = {
       "type"         = "range"
@@ -33,7 +55,7 @@ resource "databricks_cluster_policy" "admin_policy" {
     }
     "custom_tags.PolicyType" = {
       "type"  = "fixed"
-      "value" = "PlatformAdmin-Capped-10DBU"
+      "value" = "PlatformAdmin-Capped-25DBU"
     }
   })
 }
@@ -52,6 +74,10 @@ resource "databricks_cluster_policy" "data_engineers" {
   name = "Data Engineering ETL Policy"
 
   definition = jsonencode({
+    "dbus_per_hour" = {
+      "type"     = "range"
+      "maxValue" = 10
+    }
     "autoscale.min_workers" = {
       "type"         = "fixed"
       "value"        = 1
@@ -62,10 +88,33 @@ resource "databricks_cluster_policy" "data_engineers" {
       "maxValue"     = 4
       "defaultValue" = 2
     }
-    "node_type_id" = {
+    "runtime_engine" = {
       "type"         = "allowlist"
-      "values"       = ["m5.large", "m5.xlarge", "i3.xlarge"]
-      "defaultValue" = "m5.large"
+      "values"       = ["PHOTON", "STANDARD"]
+      "defaultValue" = "PHOTON"
+    }
+    "node_type_id" = {
+      "type" = "allowlist"
+      "values" = [
+        "m5.large",
+        "m5.xlarge",
+        "m5.2xlarge",
+        "i3.xlarge",
+        "i3.2xlarge",
+        "r5.xlarge",
+        "r5.2xlarge"
+      ]
+      "defaultValue" = "m5.xlarge"
+    }
+    "spark_version" = {
+      "type" = "allowlist"
+      "values" = [
+        "auto:latest-lts",
+        "auto:prev-lts",
+        "auto:latest",
+        "auto:prev-major"
+      ]
+      "defaultValue" = "auto:latest-lts"
     }
     "autotermination_minutes" = {
       "type"         = "range"
@@ -99,6 +148,27 @@ resource "databricks_cluster_policy" "data_scientists" {
   name = "Data Science ML Policy"
 
   definition = jsonencode({
+    "dbus_per_hour" = {
+      "type"     = "range"
+      "maxValue" = 10
+    }
+    "runtime_engine" = {
+      "type"   = "fixed"
+      "value"  = "STANDARD"
+      "hidden" = true
+    }
+    "spark_version" = {
+      "type" = "allowlist"
+      "values" = [
+        "auto:latest-lts-ml",
+        "auto:prev-lts-ml",
+        "auto:latest-ml",
+        "auto:prev-major-ml",
+        "auto:latest-lts",
+        "auto:prev-lts"
+      ]
+      "defaultValue" = "auto:latest-lts-ml"
+    }
     "data_security_mode" = {
       "type"         = "fixed"
       "value"        = "SINGLE_USER"
@@ -151,6 +221,25 @@ resource "databricks_cluster_policy" "data_analysts" {
   name = "Data Analytics Ad-Hoc Policy"
 
   definition = jsonencode({
+    "dbus_per_hour" = {
+      "type"     = "range"
+      "maxValue" = 10
+    }
+    "runtime_engine" = {
+      "type"   = "fixed"
+      "value"  = "STANDARD"
+      "hidden" = true
+    }
+    "spark_version" = {
+      "type" = "allowlist"
+      "values" = [
+        "auto:latest-lts",
+        "auto:prev-lts",
+        "auto:latest",
+        "auto:prev-major"
+      ]
+      "defaultValue" = "auto:latest-lts"
+    }
     "num_workers" = {
       "type"         = "fixed"
       "value"        = 0

@@ -10,7 +10,7 @@
     - Databricks MWS Networking with AWS PrivateLink VPC endpoints.
     - Dedicated root storage S3 buckets encrypted with isolated customer-managed KMS keys.
     - Generic Databricks Workspaces for Data Engineering, Data Science, and Analytics personas.
-    - Scoped compute policies (with max 10 DBU platform admin policy) and role-based permissions.
+    - Scoped compute policies (with max 25 DBU platform admin policy) and role-based permissions.
     - Autoscaled all-purpose compute clusters and cost-optimized SQL Warehouses.
 */
 

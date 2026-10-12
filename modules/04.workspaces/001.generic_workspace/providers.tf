@@ -1,3 +1,11 @@
+/*
+  Terraform and Databricks Provider Configuration - Generic Workspace Module
+  Documentation:
+    - https://registry.terraform.io/providers/databricks/databricks/latest/docs
+
+  Declares required Terraform version and Databricks MWS alias provider constraints.
+*/
+
 terraform {
   required_version = ">= 1.5.0"
 
