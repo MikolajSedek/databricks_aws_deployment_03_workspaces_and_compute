@@ -1,0 +1,5 @@
+[project]
+name = "03-workspaces-and-compute-management"
+version = "0.1.0"
+requires-python = ">=3.14"
+dependencies = []
