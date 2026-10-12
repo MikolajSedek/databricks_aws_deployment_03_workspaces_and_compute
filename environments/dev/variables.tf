@@ -69,25 +69,3 @@ variable "databricks_account_id" {
     error_message = "The Databricks account ID must be a valid UUID."
   }
 }
-
-variable "user1_email" {
-  description = "Email address of the first user to be created in Databricks."
-  type        = string
-  sensitive   = true
-
-  validation {
-    condition     = can(regex("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$", var.user1_email))
-    error_message = "The user1_email must be a valid email address."
-  }
-}
-
-variable "user2_email" {
-  description = "Email address of the second user to be created in Databricks."
-  type        = string
-  sensitive   = true
-
-  validation {
-    condition     = can(regex("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$", var.user2_email))
-    error_message = "The user2_email must be a valid email address."
-  }
-}
