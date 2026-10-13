@@ -115,8 +115,8 @@ module "workspaces" {
   network_id                      = module.mws_networking.network_id
   storage_customer_managed_key_id = module.root_buckets[each.key].customer_managed_key_id
   private_access_settings_id      = module.mws_networking.private_access_settings_id
-  admin_principal_id              = data.databricks_group.platform_admins.id
-  persona_principal_id            = each.value.persona_group_id
+  admin_group_name                = each.value.admin_group_name
+  user_group_names                = each.value.user_group_names
 }
 
 /* 7. Workspace Compute Orchestrations (Multiple Clusters & SQL Warehouses supported) */
@@ -128,12 +128,11 @@ module "compute_data_engineering" {
     databricks = databricks.workspace_de
   }
 
-  workspace_url      = module.workspaces["data_engineering"].workspace_url
-  admin_group_name   = data.databricks_group.platform_admins.display_name
-  persona_group_name = local.workspaces.data_engineering.persona_group_name
-  persona_type       = "data_engineering"
-  clusters           = local.workspaces.data_engineering.clusters
-  sql_warehouses     = local.workspaces.data_engineering.sql_warehouses
+  workspace_url    = module.workspaces["data_engineering"].workspace_url
+  admin_group_name = local.admin_group_name
+  user_group_names = local.workspaces.data_engineering.user_group_names
+  clusters         = local.workspaces.data_engineering.clusters
+  sql_warehouses   = local.workspaces.data_engineering.sql_warehouses
 }
 
 module "compute_data_science" {
@@ -143,12 +142,11 @@ module "compute_data_science" {
     databricks = databricks.workspace_ds
   }
 
-  workspace_url      = module.workspaces["data_science"].workspace_url
-  admin_group_name   = data.databricks_group.platform_admins.display_name
-  persona_group_name = local.workspaces.data_science.persona_group_name
-  persona_type       = "data_science"
-  clusters           = local.workspaces.data_science.clusters
-  sql_warehouses     = local.workspaces.data_science.sql_warehouses
+  workspace_url    = module.workspaces["data_science"].workspace_url
+  admin_group_name = local.admin_group_name
+  user_group_names = local.workspaces.data_science.user_group_names
+  clusters         = local.workspaces.data_science.clusters
+  sql_warehouses   = local.workspaces.data_science.sql_warehouses
 }
 
 module "compute_data_analytics" {
@@ -158,10 +156,9 @@ module "compute_data_analytics" {
     databricks = databricks.workspace_da
   }
 
-  workspace_url      = module.workspaces["data_analytics"].workspace_url
-  admin_group_name   = data.databricks_group.platform_admins.display_name
-  persona_group_name = local.workspaces.data_analytics.persona_group_name
-  persona_type       = "data_analytics"
-  clusters           = local.workspaces.data_analytics.clusters
-  sql_warehouses     = local.workspaces.data_analytics.sql_warehouses
+  workspace_url    = module.workspaces["data_analytics"].workspace_url
+  admin_group_name = local.admin_group_name
+  user_group_names = local.workspaces.data_analytics.user_group_names
+  clusters         = local.workspaces.data_analytics.clusters
+  sql_warehouses   = local.workspaces.data_analytics.sql_warehouses
 }

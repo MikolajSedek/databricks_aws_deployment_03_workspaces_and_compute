@@ -127,8 +127,6 @@ flowchart TD
 |:---|:---:|:---|
 | `storage_configuration_id` | `string` | The unique ID of the Databricks MWS storage configuration |
 | `customer_managed_key_id` | `string` | The Databricks MWS customer-managed key ID |
-| `bucket_name` | `string` | The name of the provisioned S3 bucket |
-| `bucket_arn` | `string` | The Amazon Resource Name (ARN) of the provisioned S3 bucket |
 
 ---
 

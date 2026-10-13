@@ -16,7 +16,7 @@
   Deploying multi-tenant Databricks environments without strict boundaries leads to resource contention, cost overruns from oversized interactive clusters, and shared credential risks. This project addresses these challenges by implementing:
   - **Account-Level Automation**: Automatic provisioning of cross-account IAM roles, AWS PrivateLink interface endpoints, dedicated customer-managed KMS encryption keys, and S3 root storage buckets registered with Databricks Multi-Workspace Service (MWS).
   - **Persona-Isolated Workspaces**: Discrete workspaces tailored to operational personas with role-based access control (RBAC).
-  - **Strict Compute Governance**: Enforced cluster policies—featuring a hard **10 DBU/hour budget cap** for platform administrators, single-node compute constraints for analysts, single-user ML configurations for data scientists, and autoscaling pipelines for data engineers.
+  - **Strict Compute Governance**: Enforced cluster policies—featuring a hard **25 DBU/hour budget cap** for platform administrators and a **15 DBU/hour cap** on shared workspace compute, paired with workload-tailored clusters and auto-stopping SQL Warehouses.
 - **Key Business & Security Outcomes**:
   - **End-to-End Encryption**: Dedicated Customer-Managed Keys (CMK) with annual rotation encrypting Terraform state, S3 root storage buckets, and DBFS storage.
   - **Network Isolation**: Complete PrivateLink connectivity for Workspace REST APIs and Secure Cluster Connectivity (SCC) Relay traffic.
@@ -53,7 +53,7 @@ Project 01 (Networking)           Project 02 (Identities)
  │               PHASE 2: COMPUTE GOVERNANCE (Workspace Plane)            │
  │                                                                        │
  │  Composite Module: 004.workspace_compute (Instantiated per Workspace)  │
- │  ├── 001.compute_policies  ──> Admin (<=10 DBU), Persona-Specific ACLs │
+ │  ├── 001.compute_policies  ──> Admin (<=25 DBU) & Shared Policy (<=15 DBU) │
  │  ├── 002.all_purpose_cluster ──> Auto-scaling clusters bound to policy │
  │  └── 003.sql_warehouse      ──> Auto-stopping BI Warehouses with ACLs  │
  └────────────────────────────────────────────────────────────────────────┘
@@ -80,7 +80,6 @@ Project 01 (Networking)           Project 02 (Identities)
 │       ├── data.tf                      # AWS & Databricks account data sources
 │       ├── locals.tf                    # Persona workspaces, cluster sizing & warehouse specs
 │       ├── main.tf                      # Module instantiations for dev environment
-│       ├── outputs.tf                   # Workspace URLs, storage IDs, cluster IDs
 │       ├── providers.tf                 # AWS, MWS, and workspace-scoped Databricks providers
 │       ├── variables.tf                 # Environment input variables
 │       └── README.md                    # Environment-specific deployment manual
@@ -96,7 +95,7 @@ Project 01 (Networking)           Project 02 (Identities)
     ├── 04.workspaces/
     │   └── 001.generic_workspace/          # Databricks MWS Workspace & group role assignments
     └── 05.compute/
-        ├── 001.compute_policies/           # Capped Admin policy (<=10 DBU) & persona policies
+        ├── 001.compute_policies/           # Capped Admin policy (<=25 DBU) & Shared policy (<=15 DBU)
         ├── 002.all_purpose_cluster/        # Policy-governed autoscaling compute clusters
         ├── 003.sql_warehouse/              # Cost-optimized Serverless/Pro SQL Warehouses
         └── 004.workspace_compute/          # Composite orchestrator binding policies, clusters & SQL
@@ -112,7 +111,7 @@ Project 01 (Networking)           Project 02 (Identities)
 | [`modules/03.storage/001.env_backend_bucket`](file:///modules/03.storage/001.env_backend_bucket) | `aws_s3_bucket`, `aws_s3_bucket_server_side_encryption_configuration`, `aws_s3_bucket_public_access_block` | S3 remote state backend bucket with SSE-KMS, versioning, and public access blocks |
 | [`modules/03.storage/002.databricks_root_bucket`](file:///modules/03.storage/002.databricks_root_bucket) | `aws_s3_bucket`, `aws_s3_bucket_policy`, `databricks_mws_customer_managed_keys`, `databricks_mws_storage_configurations` | Workspace root storage bucket, Databricks bucket policy, CMK registration, and MWS storage configuration |
 | [`modules/04.workspaces/001.generic_workspace`](file:///modules/04.workspaces/001.generic_workspace) | `databricks_mws_workspaces`, `databricks_mws_permission_assignment` | Encapsulated workspace provisioning linking credentials, storage, network, and KMS; group RBAC assignments |
-| [`modules/05.compute/001.compute_policies`](file:///modules/05.compute/001.compute_policies) | `databricks_cluster_policy`, `databricks_permissions` | 4 cluster policies: Platform Admin (<=10 DBU cap), Data Engineering, Data Science, and Data Analytics |
+| [`modules/05.compute/001.compute_policies`](file:///modules/05.compute/001.compute_policies) | `databricks_cluster_policy`, `databricks_permissions` | Capped Platform Admin policy (<=25 DBU cap) and Workspace Shared policy (<=15 DBU cap) with group ACLs |
 | [`modules/05.compute/002.all_purpose_cluster`](file:///modules/05.compute/002.all_purpose_cluster) | `databricks_cluster`, `databricks_permissions` | Policy-bound autoscaling interactive clusters with autotermination and permissions |
 | [`modules/05.compute/003.sql_warehouse`](file:///modules/05.compute/003.sql_warehouse) | `databricks_sql_endpoint`, `databricks_permissions` | Serverless/Pro SQL Warehouses with configurable auto-stop and group access controls |
 | [`modules/05.compute/004.workspace_compute`](file:///modules/05.compute/004.workspace_compute) | Composite (`001`, `002`, `003` submodules) | Single unified workspace compute instantiation supporting multiple clusters and SQL endpoints per workspace |
@@ -190,7 +189,7 @@ flowchart TD
 
     subgraph Phase2 ["Phase 2: Compute Governance (Workspace Plane)"]
         subgraph CompositeCompute ["004.workspace_compute (per Persona Workspace)"]
-            POL["001.compute_policies<br/>(Admin <=10 DBU & Persona Policies)"]:::policy
+            POL["001.compute_policies<br/>(Admin <=25 DBU & Shared <=15 DBU)"]:::policy
             CLS["002.all_purpose_cluster<br/>(Autoscaling Cluster Engine)"]:::compute
             SQL["003.sql_warehouse<br/>(Serverless / Pro SQL Warehouse)"]:::compute
 
@@ -203,16 +202,17 @@ flowchart TD
 
 ---
 
-## 5. Compute Policy Governance Matrix
+## 5. Compute Policy & Workload Governance Matrix
 
-Every workspace automatically deploys the **Platform Admin** policy alongside its designated persona policy:
+Every workspace automatically deploys the capped **Platform Admin** policy alongside the **Workspace Shared** policy, with clusters and SQL Warehouses tailored to each workload:
 
-| Policy Name | Scope / Target Workspace | Core Constraints & Rules | Allowed Instance Families | Group RBAC |
+| Policy / Workload | Scope / Target Workspace | Core Constraints & Rules | Allowed Instance Families | Group RBAC |
 |:---|:---|:---|:---|:---|
-| **Platform Admin** | All Workspaces | **Max 10 DBUs/hr budget cap**, max 4 workers, max 45 min idle timeout, no GPU instances | `m5.large`, `m5.xlarge`, `c5.xlarge` | `CAN_USE` for `dbx-platform-admins` |
-| **Data Engineering** | `data_engineering` | Autoscaling 1–4 workers, max 30 min idle timeout, Photon acceleration supported | `i3.xlarge`, `m5d.xlarge`, `r5d.xlarge` | `CAN_USE` for `dbx-data-engineers` |
-| **Data Science** | `data_science` | Single-user security mode, ML runtimes, GPU and compute-optimized instances, max 20 min idle timeout | `g4dn.xlarge`, `p3.2xlarge`, `c5.2xlarge` | `CAN_USE` for `dbx-data-scientists` |
-| **Data Analytics** | `data_analytics` | Single-node only (`num_workers = 0`), max 15 min idle timeout (directs heavy queries to SQL Warehouses) | `m5.large`, `m5.xlarge` | `CAN_USE` for `dbx-data-analysts` |
+| **Platform Admin Policy** | All Workspaces | **Max 25 DBUs/hr budget cap**, max 4 workers, max 45 min idle timeout | `m5.large`, `m5.xlarge`, `m5.2xlarge`, `c5.xlarge`, `c5.2xlarge`, `r5.xlarge`, `r5.2xlarge` | `CAN_USE` for `dbx-platform-admins` |
+| **Workspace Shared Policy** | All Workspaces | **Max 15 DBUs/hr budget cap**, auto-scaling 1–4 workers, max 30 min idle timeout | `m5.large`, `m5.xlarge`, `m5.2xlarge`, `i3.xlarge`, `r5.xlarge` | `CAN_USE` for `dbx-platform-admins` & workspace user groups |
+| **Data Engineering Compute** | `data_engineering` | ETL cluster (`de-etl-cluster-dev`, 1–3 workers, 30 min idle timeout) + SQL Warehouse (`de-sql-warehouse-dev`, `2X-Small`, 15 min auto-stop) | `m5.large` | `CAN_RESTART`/`CAN_USE` for `dbx-data-engineers` |
+| **Data Science Compute** | `data_science` | ML cluster (`ds-ml-cluster-dev`, 1–2 workers, ML runtime, 20 min idle timeout) | `m5.xlarge` | `CAN_RESTART` for `dbx-data-scientists` |
+| **Data Analytics Compute** | `data_analytics` | BI SQL Warehouse (`da-bi-warehouse-dev`, `X-Small`, 10 min auto-stop) | `X-Small` SQL Warehouse | `CAN_USE` for `dbx-data-analysts` |
 
 ---
 

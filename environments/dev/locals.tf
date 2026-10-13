@@ -26,15 +26,18 @@ locals {
   credentials_name        = "${local.project_name}-credentials-${local.env}"
   network_name            = "${local.project_name}-mws-network-${local.env}"
 
+  /* Databricks Platform Administration Group */
+  admin_group_name = data.databricks_group.platform_admins.display_name
+
   /* Declarative Multi-Workspace Configuration */
   workspaces = {
     data_engineering = {
-      workspace_name     = "${local.project_name}-de-${local.env}"
-      root_bucket_name   = "${local.project_name}-de-root-${local.env}"
-      kms_key_alias      = "dbx_de_root_kms"
-      kms_description    = "Customer-managed KMS key for Data Engineering workspace root storage"
-      persona_group_id   = data.databricks_group.data_engineers.id
-      persona_group_name = data.databricks_group.data_engineers.display_name
+      workspace_name   = "${local.project_name}-de-${local.env}"
+      root_bucket_name = "${local.project_name}-de-root-${local.env}"
+      kms_key_alias    = "dbx_de_root_kms"
+      kms_description  = "Customer-managed KMS key for Data Engineering workspace root storage"
+      admin_group_name = local.admin_group_name
+      user_group_names = [data.databricks_group.data_engineers.display_name]
 
       clusters = {
         etl_shared = {
@@ -47,25 +50,27 @@ locals {
           custom_tags = {
             Workload = "ETL"
           }
+          user_group_names = [data.databricks_group.data_engineers.display_name]
         }
       }
 
       sql_warehouses = {
         primary = {
-          name           = "de-sql-warehouse-${local.env}"
-          cluster_size   = "2X-Small"
-          auto_stop_mins = 15
+          name             = "de-sql-warehouse-${local.env}"
+          cluster_size     = "2X-Small"
+          auto_stop_mins   = 15
+          user_group_names = [data.databricks_group.data_engineers.display_name]
         }
       }
     }
 
     data_science = {
-      workspace_name     = "${local.project_name}-ds-${local.env}"
-      root_bucket_name   = "${local.project_name}-ds-root-${local.env}"
-      kms_key_alias      = "dbx_ds_root_kms"
-      kms_description    = "Customer-managed KMS key for Data Science workspace root storage"
-      persona_group_id   = data.databricks_group.data_scientists.id
-      persona_group_name = data.databricks_group.data_scientists.display_name
+      workspace_name   = "${local.project_name}-ds-${local.env}"
+      root_bucket_name = "${local.project_name}-ds-root-${local.env}"
+      kms_key_alias    = "dbx_ds_root_kms"
+      kms_description  = "Customer-managed KMS key for Data Science workspace root storage"
+      admin_group_name = local.admin_group_name
+      user_group_names = [data.databricks_group.data_scientists.display_name]
 
       clusters = {
         ml_exploration = {
@@ -78,6 +83,7 @@ locals {
           custom_tags = {
             Workload = "ModelTraining"
           }
+          user_group_names = [data.databricks_group.data_scientists.display_name]
         }
       }
 
@@ -85,20 +91,21 @@ locals {
     }
 
     data_analytics = {
-      workspace_name     = "${local.project_name}-da-${local.env}"
-      root_bucket_name   = "${local.project_name}-da-root-${local.env}"
-      kms_key_alias      = "dbx_da_root_kms"
-      kms_description    = "Customer-managed KMS key for Data Analytics workspace root storage"
-      persona_group_id   = data.databricks_group.data_analysts.id
-      persona_group_name = data.databricks_group.data_analysts.display_name
+      workspace_name   = "${local.project_name}-da-${local.env}"
+      root_bucket_name = "${local.project_name}-da-root-${local.env}"
+      kms_key_alias    = "dbx_da_root_kms"
+      kms_description  = "Customer-managed KMS key for Data Analytics workspace root storage"
+      admin_group_name = local.admin_group_name
+      user_group_names = [data.databricks_group.data_analysts.display_name]
 
       clusters = {}
 
       sql_warehouses = {
         bi_reporting = {
-          name           = "da-bi-warehouse-${local.env}"
-          cluster_size   = "X-Small"
-          auto_stop_mins = 10
+          name             = "da-bi-warehouse-${local.env}"
+          cluster_size     = "X-Small"
+          auto_stop_mins   = 10
+          user_group_names = [data.databricks_group.data_analysts.display_name]
         }
       }
     }

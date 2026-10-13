@@ -12,6 +12,7 @@ resource "databricks_sql_endpoint" "this" {
   max_num_clusters          = var.max_num_clusters
   auto_stop_mins            = var.auto_stop_mins
   warehouse_type            = var.warehouse_type
+  enable_photon             = var.enable_photon
   enable_serverless_compute = var.enable_serverless_compute
 
   tags {
@@ -34,7 +35,7 @@ resource "databricks_permissions" "warehouse_permissions" {
   }
 
   dynamic "access_control" {
-    for_each = var.user_group_name != null ? [var.user_group_name] : []
+    for_each = var.user_group_names
     content {
       group_name       = access_control.value
       permission_level = "CAN_USE"

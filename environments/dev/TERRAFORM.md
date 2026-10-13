@@ -61,11 +61,5 @@
 
 ## Outputs
 
-| Name | Description |
-|------|-------------|
-| <a name="output_backend_bucket_name"></a> [backend\_bucket\_name](#output\_backend\_bucket\_name) | The S3 bucket name used for remote state storage. |
-| <a name="output_cross_account_role_arn"></a> [cross\_account\_role\_arn](#output\_cross\_account\_role\_arn) | The ARN of the AWS IAM cross-account role assumed by Databricks. |
-| <a name="output_mws_network_id"></a> [mws\_network\_id](#output\_mws\_network\_id) | The unique identifier of the registered Databricks MWS network configuration. |
-| <a name="output_workspace_ids"></a> [workspace\_ids](#output\_workspace\_ids) | Map of workspace keys to their numeric Databricks workspace IDs. |
-| <a name="output_workspace_urls"></a> [workspace\_urls](#output\_workspace\_urls) | Map of workspace keys to their access URLs. |
+No outputs.
 <!-- END_TF_DOCS -->

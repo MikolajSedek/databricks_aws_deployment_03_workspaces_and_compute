@@ -4,8 +4,8 @@
     - https://registry.terraform.io/providers/databricks/databricks/latest/docs
 
   Aggregates and orchestrates:
-    - Compute policies (including max 25 DBU admin policy and persona policy)
-    - Multiple all-purpose compute clusters governed by the persona policy
+    - Compute policies (including max 25 DBU platform admin policy and shared policy)
+    - Multiple all-purpose compute clusters governed by cluster policy
     - Multiple SQL Warehouses governed by role-based ACLs
 */
 
@@ -13,18 +13,8 @@
 module "compute_policies" {
   source = "../001.compute_policies"
 
-  admin_group_name           = var.admin_group_name
-  data_engineers_group_name  = var.persona_type == "data_engineering" ? var.persona_group_name : null
-  data_scientists_group_name = var.persona_type == "data_science" ? var.persona_group_name : null
-  data_analysts_group_name   = var.persona_type == "data_analytics" ? var.persona_group_name : null
-}
-
-locals {
-  persona_policy_map = {
-    data_engineering = module.compute_policies.policy_ids["data_engineers"]
-    data_science     = module.compute_policies.policy_ids["data_scientists"]
-    data_analytics   = module.compute_policies.policy_ids["data_analysts"]
-  }
+  admin_group_name = var.admin_group_name
+  user_group_names = var.user_group_names
 }
 
 /* 2. All-Purpose Clusters (Supports multiple clusters per workspace) */
@@ -35,13 +25,13 @@ module "clusters" {
   cluster_name            = each.value.cluster_name
   spark_version           = each.value.spark_version
   node_type_id            = each.value.node_type_id
-  policy_id               = local.persona_policy_map[var.persona_type]
+  policy_id               = coalesce(each.value.policy_id, module.compute_policies.shared_policy_id)
   min_workers             = each.value.min_workers
   max_workers             = each.value.max_workers
   autotermination_minutes = each.value.autotermination_minutes
   custom_tags             = each.value.custom_tags
   admin_group_name        = var.admin_group_name
-  user_group_name         = var.persona_group_name
+  user_group_names        = each.value.user_group_names != null ? each.value.user_group_names : var.user_group_names
 }
 
 /* 3. SQL Warehouses (Supports multiple SQL Warehouses per workspace) */
@@ -55,8 +45,9 @@ module "sql_warehouses" {
   max_num_clusters          = each.value.max_num_clusters
   auto_stop_mins            = each.value.auto_stop_mins
   warehouse_type            = each.value.warehouse_type
+  enable_photon             = each.value.enable_photon
   enable_serverless_compute = each.value.enable_serverless_compute
   tags                      = each.value.tags
   admin_group_name          = var.admin_group_name
-  user_group_name           = var.persona_group_name
+  user_group_names          = each.value.user_group_names != null ? each.value.user_group_names : var.user_group_names
 }

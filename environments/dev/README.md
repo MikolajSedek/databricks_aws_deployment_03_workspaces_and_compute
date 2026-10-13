@@ -17,7 +17,7 @@
   - **AWS & Account Foundation**: Dedicated cross-account IAM role with AWS STS propagation protection, AWS PrivateLink interface endpoints for Workspace REST and SCC Relay traffic, and Databricks MWS network configuration.
   - **Isolated Storage**: Dedicated Amazon S3 root storage buckets per workspace, each encrypted with an independent customer-managed KMS key and registered with Databricks MWS.
   - **Multi-Workspace Fabric**: Discrete Databricks workspaces for `data_engineering`, `data_science`, and `data_analytics` personas with authoritative access assignments.
-  - **Strict Compute Governance**: Enforced cluster policies—including a Platform Admin policy capped at **maximum 10 DBUs/hr**—ensuring no unconstrained clusters can be launched.
+  - **Strict Compute Governance**: Enforced cluster policies—including a Platform Admin policy capped at **maximum 25 DBUs/hr** and a Shared Workspace policy capped at **maximum 15 DBUs/hr**—ensuring no unconstrained clusters can be launched.
   - **Configured Workloads**: Automated autoscaling compute clusters and cost-optimized SQL Warehouses orchestrated via a single composite module instantiated per workspace.
 
 ---
@@ -44,7 +44,7 @@ Project 02 (Account Groups)          ──>  Databricks Data Lookups (data.tf)
          ┌──────────────────────────────────────────────────────────────┐
          │              Phase 2: Compute Governance (Workspace Plane)   │
          │  Composite Module: 004.workspace_compute (Instantiated 3x)   │
-         │  - Compute Policies (Admin <=10 DBU, DE, DS, DA)             │
+         │  - Compute Policies (Admin <=25 DBU & Shared <=15 DBU)       │
          │  - All-Purpose Compute Clusters (tied to policy IDs)         │
          │  - SQL Warehouses (with inactivity auto-stop)                │
          └──────────────────────────────────────────────────────────────┘
@@ -184,14 +184,17 @@ terraform apply
 
 ---
 
-## 6. Compute Policy Governance Matrix
+## 6. Compute Policy & Workload Governance Matrix
 
-| Persona / Policy | Target Workspace | Core Constraints | Group Permissions |
+All workspaces deploy the capped **Platform Admin** policy alongside the **Workspace Shared** policy, with clusters and SQL Warehouses tailored to each workload:
+
+| Policy / Workload | Scope / Target Workspace | Core Constraints | Group Permissions |
 |:---|:---|:---|:---|
-| **Platform Admin** | All Workspaces | **Max 10 DBUs/hr cap**, max 4 workers, cost-efficient nodes (`m5.large`, `m5.xlarge`, `c5.xlarge`), max 45 min idle timeout | `CAN_USE` for `dbx-platform-admins` |
-| **Data Engineering** | `data_engineering` | Auto-scaling 1–4 nodes, max 30 min idle timeout, ETL-ready compute | `CAN_USE` for `dbx-data-engineers` |
-| **Data Science** | `data_science` | Single-user security mode, ML runtimes, GPU/CPU instances, max 20 min idle timeout | `CAN_USE` for `dbx-data-scientists` |
-| **Data Analytics** | `data_analytics` | Single-node compute only (0 workers), max 15 min idle timeout | `CAN_USE` for `dbx-data-analysts` |
+| **Platform Admin Policy** | All Workspaces | **Max 25 DBUs/hr budget cap**, max 4 workers, cost-efficient instance types (`m5.large`, `m5.xlarge`, `m5.2xlarge`, `c5.xlarge`, `c5.2xlarge`, `r5.xlarge`, `r5.2xlarge`), max 45 min idle timeout | `CAN_USE` for `dbx-platform-admins` |
+| **Workspace Shared Policy** | All Workspaces | **Max 15 DBUs/hr budget cap**, auto-scaling 1–4 workers, max 30 min idle timeout | `CAN_USE` for `dbx-platform-admins` & workspace user groups |
+| **Data Engineering Compute** | `data_engineering` | ETL cluster (`de-etl-cluster-dev`, 1–3 workers, `m5.large`, 30 min idle timeout) + SQL Warehouse (`de-sql-warehouse-dev`, `2X-Small`, 15 min auto-stop) | `CAN_RESTART`/`CAN_USE` for `dbx-data-engineers` |
+| **Data Science Compute** | `data_science` | ML cluster (`ds-ml-cluster-dev`, 1–2 workers, `m5.xlarge`, ML runtime, 20 min idle timeout) | `CAN_RESTART` for `dbx-data-scientists` |
+| **Data Analytics Compute** | `data_analytics` | BI SQL Warehouse (`da-bi-warehouse-dev`, `X-Small`, 10 min auto-stop) | `CAN_USE` for `dbx-data-analysts` |
 
 ---
 
@@ -207,4 +210,4 @@ terraform apply
 - [`05.compute/002.all_purpose_cluster`](file:///modules/05.compute/002.all_purpose_cluster): Policy-enforced autoscaling clusters.
 - [`05.compute/003.sql_warehouse`](file:///modules/05.compute/003.sql_warehouse): Auto-stopping BI SQL Warehouses.
 - [`05.compute/004.workspace_compute`](file:///modules/05.compute/004.workspace_compute): Composite workspace compute module unifying policies, clusters, and warehouses into a single instantiation.
-- [Terraform Documentation Interface (`TERRAFORM.md`)](./TERRAFORM.md): Machine-generated documentation of all inputs, outputs, and provider dependencies.
+- [Terraform Documentation Interface (`TERRAFORM.md`)](./TERRAFORM.md): Machine-generated documentation of all inputs and provider dependencies (no public outputs exposed).

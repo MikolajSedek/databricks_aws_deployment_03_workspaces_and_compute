@@ -15,19 +15,10 @@ variable "admin_group_name" {
   type        = string
 }
 
-variable "persona_group_name" {
-  description = "Name of the persona group (e.g. data_engineers, data_scientists, data_analysts)."
-  type        = string
-}
-
-variable "persona_type" {
-  description = "Type of persona to configure: 'data_engineering', 'data_science', or 'data_analytics'."
-  type        = string
-
-  validation {
-    condition     = contains(["data_engineering", "data_science", "data_analytics"], var.persona_type)
-    error_message = "persona_type must be one of: 'data_engineering', 'data_science', 'data_analytics'."
-  }
+variable "user_group_names" {
+  description = "List of user group names (e.g. ['dbx-data-engineers']) granted workspace compute access."
+  type        = list(string)
+  default     = []
 }
 
 variable "clusters" {
@@ -36,10 +27,12 @@ variable "clusters" {
     cluster_name            = string
     spark_version           = string
     node_type_id            = string
+    policy_id               = optional(string)
     min_workers             = number
     max_workers             = number
     autotermination_minutes = optional(number, 30)
     custom_tags             = optional(map(string), {})
+    user_group_names        = optional(list(string))
   }))
   default = {}
 }
@@ -53,8 +46,10 @@ variable "sql_warehouses" {
     max_num_clusters          = optional(number, 1)
     auto_stop_mins            = optional(number, 15)
     warehouse_type            = optional(string, "PRO")
+    enable_photon             = optional(bool, true)
     enable_serverless_compute = optional(bool, false)
     tags                      = optional(map(string), {})
+    user_group_names          = optional(list(string))
   }))
   default = {}
 }

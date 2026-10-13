@@ -10,20 +10,8 @@ variable "admin_group_name" {
   type        = string
 }
 
-variable "data_engineers_group_name" {
-  description = "The workspace group name for data engineers (e.g. dbx-data-engineers)."
-  type        = string
-  default     = null
-}
-
-variable "data_scientists_group_name" {
-  description = "The workspace group name for data scientists (e.g. dbx-data-scientists)."
-  type        = string
-  default     = null
-}
-
-variable "data_analysts_group_name" {
-  description = "The workspace group name for data analysts (e.g. dbx-data-analysts)."
-  type        = string
-  default     = null
+variable "user_group_names" {
+  description = "List of user group names granted CAN_USE permission on the shared policy."
+  type        = list(string)
+  default     = []
 }

@@ -267,7 +267,7 @@ Mermaid CLI (`@mermaid-js/mermaid-cli`) parses markdown files, extracts fenced `
   - Retain all original pipeline jobs and steps (Pre-commit checks, Terraform Validate & Plan with plan caching, and Terraform Apply gated by Environment protection rules).
 - **Code Organization**:
   - Follow modular architecture in `modules/` with isolated environments in `environments/<env>/` .
-  - Maintain consistent file structure (`main.tf`, `variables.tf`, `locals.tf`, `outputs.tf`, `README.md`, `TERRAFORM.md`).
+  - Maintain consistent file structure (`main.tf`, `variables.tf`, `locals.tf`, `outputs.tf` (only when active downstream consumers exist; delete if empty/unneeded), `README.md`, `TERRAFORM.md`).
 - **Formatting & Validation**:
   - Run `terraform fmt -recursive` and validate against configured linters (TFLint, Trivy, Checkov).
 
@@ -297,18 +297,31 @@ Mermaid CLI (`@mermaid-js/mermaid-cli`) parses markdown files, extracts fenced `
   - Keep HCL code **DRY** (Don't Repeat Yourself) through reusable variables, locals, and submodules.
   - **Avoid over-engineering**: Do not introduce unnecessary layers of indirection, excessive meta-arguments, or rigid abstractions that obscure readability and maintenance.
 
-### C. Module File Structure & Sizing Rules
-When creating any new module, strictly follow this standard file layout:
+### C. Module & Environment File Structure Rules
+When creating any new module or root environment, strictly follow this standard file layout:
 - **`variables.tf`** (*Required*): All input variable definitions with explicit `type`, `description`, and appropriate `validation` blocks.
 - **`main.tf`** (*Required*): Core primary resource declarations.
 - **`locals.tf`** (*Optional*): Internal computations, mapped tags, and transformed data structures.
-- **`outputs.tf`** (*Optional*): Return values and attributes exported for consumption by other modules or environments.
+- **`outputs.tf`** (*Optional*): Return values and attributes strictly exported for consumption by downstream modules, external systems, or automation pipelines. Never declare speculative, unused, or duplicate outputs. **If no active downstream consumers exist, omit or delete `outputs.tf` entirely** (especially in root environments under `environments/<env>/`).
 - **Extra Functional Files**:
   - Break resources into additional dedicated files named by functionality to keep `main.tf` modular and compact (e.g., `vpc_spoke_endpoints.tf`, `vpc_spoke_route_tables.tf`, `vpc_spoke_security_groups.tf`, `network_firewall_rule_groups.tf`).
 - **File Length Limit**:
   - Keep `main.tf` compact: **avoid any `main.tf` exceeding 250 lines**.
 
-### D. Authoritative Verification & Anti-Hallucination Policy
+### D. Output Minimization & Anti-Redundancy Rule (Strictly Enforced)
+- **Universal Scope (Modules & Environments)**:
+  - This rule applies equally to reusable child modules (`modules/`) and root deployment environments (`environments/<env>/`).
+- **Downstream-Driven Exports Only**:
+  - Every module or environment output must be actively consumed by a downstream module, parent environment, root orchestrator, external automation pipeline (e.g., CI/CD workflow steps), or remote state reader (`terraform_remote_state`).
+- **Delete `outputs.tf` When Unneeded in Environments & Modules**:
+  - If a module or root environment does not require outputs for downstream consumption or automation, **do not keep an empty, commented-out, or speculative `outputs.tf` file—delete the `outputs.tf` file entirely**.
+- **No Speculative or Display-Only Outputs**:
+  - Never export resource attributes "just in case", for speculative future requirements, or merely for manual terminal inspection. If no active resource, data source, calling module, or automated pipeline consumes `module.<name>.<output>` or an environment output, it must not exist.
+  - **No Redundant / Duplicate Formats**: Avoid exporting both granular scalar attributes and compound objects/maps containing the identical data unless strictly required by downstream consumers with differing consumption models.
+  - **Audit and Prune on Refactor**: Whenever refactoring inputs, resources, dependencies, or environments, immediately audit all outputs across modified modules and environments. Remove any orphaned outputs, and delete `outputs.tf` if zero active outputs remain.
+  - **Documentation Alignment**: Keep `README.md` and generated `TERRAFORM.md` in sync across both modules and environments whenever outputs are added, modified, or pruned (regenerate via `terraform-docs`).
+
+### E. Authoritative Verification & Anti-Hallucination Policy
 - **Authoritative Source Verification**:
   - Always use official, authoritative AWS and Databricks documentation and repositories (including [Official Databricks GitHub Repositories](https://github.com/orgs/databricks/repositories?type=all) and [Databricks Terraform Provider Examples](https://github.com/databricks/terraform-databricks-examples) — when deploying with AWS, use only AWS examples) when creating new Terraform code for any repository.
   - Verify every resource, block type, argument name, and behavior against official documentation or live MCP tools (`aws-docs`, `terraform`).
@@ -321,7 +334,7 @@ When creating any new module, strictly follow this standard file layout:
     - For all workspace provisioning patterns, refer to the [`.github/skills/databricks-aws-workspace/SKILL.md`](./skills/databricks-aws-workspace/SKILL.md) skill. Follow the strict separation rule between the workspace creation module (`provider = databricks.mws`) and downstream workspace management modules (`provider = databricks`).
   - **Never guess provider scopes**: Always check the official [Databricks Terraform Provider Documentation](https://registry.terraform.io/providers/databricks/databricks/latest/docs) to determine whether a resource operates at the account or workspace level.
 
-### E. Pre-Commit Execution, Documentation & Exception Handling
+### F. Pre-Commit Execution, Documentation & Exception Handling
 - **Pre-Commit Execution**:
   - Always execute pre-commit checks (`pre-commit run --all-files`) against newly created or modified code to validate formatting, linting, and security compliance.
 - **Module README Generation**:
@@ -334,7 +347,7 @@ When creating any new module, strictly follow this standard file layout:
     2. Cloud provider / tooling limitation.
     3. Compensating security control (see [`.trivyignore`](file:///.trivyignore) for reference format).
 
-### F. Verification & Operational Guardrails
+### G. Verification & Operational Guardrails
 - **Terraform Verification / Validation**:
   - At the end of implementation, always run `terraform validate` (`terraform verify`) across all modified modules and environments to ensure structural and syntactic validity.
 - **Strict Apply Guardrail**:

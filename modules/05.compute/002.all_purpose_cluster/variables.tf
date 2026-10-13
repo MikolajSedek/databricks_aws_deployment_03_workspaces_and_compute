@@ -43,14 +43,14 @@ variable "max_workers" {
 }
 
 variable "admin_group_name" {
-  description = "Group name granted CAN_MANAGE permission."
+  description = "Single platform admin group name granted CAN_MANAGE permission."
   type        = string
 }
 
-variable "user_group_name" {
-  description = "Group name granted CAN_RESTART and CAN_ATTACH_TO permission."
-  type        = string
-  default     = null
+variable "user_group_names" {
+  description = "List of group names granted CAN_RESTART and CAN_ATTACH_TO permissions."
+  type        = list(string)
+  default     = []
 }
 
 variable "custom_tags" {

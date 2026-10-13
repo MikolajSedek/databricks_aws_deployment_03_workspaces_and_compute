@@ -34,7 +34,7 @@ resource "databricks_permissions" "cluster_permissions" {
   }
 
   dynamic "access_control" {
-    for_each = var.user_group_name != null ? [var.user_group_name] : []
+    for_each = var.user_group_names
     content {
       group_name       = access_control.value
       permission_level = "CAN_RESTART"

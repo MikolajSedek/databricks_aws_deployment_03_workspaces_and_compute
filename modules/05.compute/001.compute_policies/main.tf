@@ -69,14 +69,14 @@ resource "databricks_permissions" "admin_policy" {
   }
 }
 
-/* 2. Data Engineering Compute Policy */
-resource "databricks_cluster_policy" "data_engineers" {
-  name = "Data Engineering ETL Policy"
+/* 2. Shared Workspace Compute Policy (Governs general team compute) */
+resource "databricks_cluster_policy" "shared_policy" {
+  name = "Workspace Shared Compute Policy"
 
   definition = jsonencode({
     "dbus_per_hour" = {
       "type"     = "range"
-      "maxValue" = 10
+      "maxValue" = 15
     }
     "autoscale.min_workers" = {
       "type"         = "fixed"
@@ -100,17 +100,17 @@ resource "databricks_cluster_policy" "data_engineers" {
         "m5.xlarge",
         "m5.2xlarge",
         "i3.xlarge",
-        "i3.2xlarge",
-        "r5.xlarge",
-        "r5.2xlarge"
+        "r5.xlarge"
       ]
-      "defaultValue" = "m5.xlarge"
+      "defaultValue" = "m5.large"
     }
     "spark_version" = {
       "type" = "allowlist"
       "values" = [
         "auto:latest-lts",
         "auto:prev-lts",
+        "auto:latest-lts-ml",
+        "auto:prev-lts-ml",
         "auto:latest",
         "auto:prev-major"
       ]
@@ -121,162 +121,26 @@ resource "databricks_cluster_policy" "data_engineers" {
       "maxValue"     = 30
       "defaultValue" = 20
     }
-    "custom_tags.Team" = {
+    "custom_tags.ManagedBy" = {
       "type"  = "fixed"
-      "value" = "DataEngineering"
+      "value" = "Terraform"
     }
   })
 }
 
-resource "databricks_permissions" "data_engineers" {
-  count             = var.data_engineers_group_name != null ? 1 : 0
-  cluster_policy_id = databricks_cluster_policy.data_engineers.id
+resource "databricks_permissions" "shared_policy" {
+  cluster_policy_id = databricks_cluster_policy.shared_policy.id
 
   access_control {
     group_name       = var.admin_group_name
     permission_level = "CAN_USE"
   }
 
-  access_control {
-    group_name       = var.data_engineers_group_name
-    permission_level = "CAN_USE"
-  }
-}
-
-/* 3. Data Science Compute Policy (ML Runtimes & Single-User Mode) */
-resource "databricks_cluster_policy" "data_scientists" {
-  name = "Data Science ML Policy"
-
-  definition = jsonencode({
-    "dbus_per_hour" = {
-      "type"     = "range"
-      "maxValue" = 10
+  dynamic "access_control" {
+    for_each = var.user_group_names
+    content {
+      group_name       = access_control.value
+      permission_level = "CAN_USE"
     }
-    "runtime_engine" = {
-      "type"   = "fixed"
-      "value"  = "STANDARD"
-      "hidden" = true
-    }
-    "spark_version" = {
-      "type" = "allowlist"
-      "values" = [
-        "auto:latest-lts-ml",
-        "auto:prev-lts-ml",
-        "auto:latest-ml",
-        "auto:prev-major-ml",
-        "auto:latest-lts",
-        "auto:prev-lts"
-      ]
-      "defaultValue" = "auto:latest-lts-ml"
-    }
-    "data_security_mode" = {
-      "type"         = "fixed"
-      "value"        = "SINGLE_USER"
-      "defaultValue" = "SINGLE_USER"
-    }
-    "autoscale.min_workers" = {
-      "type"         = "fixed"
-      "value"        = 1
-      "defaultValue" = 1
-    }
-    "autoscale.max_workers" = {
-      "type"         = "range"
-      "maxValue"     = 2
-      "defaultValue" = 1
-    }
-    "node_type_id" = {
-      "type"         = "allowlist"
-      "values"       = ["m5.large", "m5.xlarge", "g4dn.xlarge"]
-      "defaultValue" = "m5.xlarge"
-    }
-    "autotermination_minutes" = {
-      "type"         = "range"
-      "maxValue"     = 25
-      "defaultValue" = 20
-    }
-    "custom_tags.Team" = {
-      "type"  = "fixed"
-      "value" = "DataScience"
-    }
-  })
-}
-
-resource "databricks_permissions" "data_scientists" {
-  count             = var.data_scientists_group_name != null ? 1 : 0
-  cluster_policy_id = databricks_cluster_policy.data_scientists.id
-
-  access_control {
-    group_name       = var.admin_group_name
-    permission_level = "CAN_USE"
-  }
-
-  access_control {
-    group_name       = var.data_scientists_group_name
-    permission_level = "CAN_USE"
-  }
-}
-
-/* 4. Data Analytics Compute Policy (Restricted single-node small compute) */
-resource "databricks_cluster_policy" "data_analysts" {
-  name = "Data Analytics Ad-Hoc Policy"
-
-  definition = jsonencode({
-    "dbus_per_hour" = {
-      "type"     = "range"
-      "maxValue" = 10
-    }
-    "runtime_engine" = {
-      "type"   = "fixed"
-      "value"  = "STANDARD"
-      "hidden" = true
-    }
-    "spark_version" = {
-      "type" = "allowlist"
-      "values" = [
-        "auto:latest-lts",
-        "auto:prev-lts",
-        "auto:latest",
-        "auto:prev-major"
-      ]
-      "defaultValue" = "auto:latest-lts"
-    }
-    "num_workers" = {
-      "type"         = "fixed"
-      "value"        = 0
-      "defaultValue" = 0
-    }
-    "spark_conf.spark.databricks.cluster.profile" = {
-      "type"  = "fixed"
-      "value" = "singleNode"
-    }
-    "node_type_id" = {
-      "type"         = "allowlist"
-      "values"       = ["m5.large"]
-      "defaultValue" = "m5.large"
-    }
-    "autotermination_minutes" = {
-      "type"         = "range"
-      "maxValue"     = 15
-      "defaultValue" = 10
-    }
-    "custom_tags.Team" = {
-      "type"  = "fixed"
-      "value" = "DataAnalytics"
-    }
-  })
-}
-
-resource "databricks_permissions" "data_analysts" {
-  count             = var.data_analysts_group_name != null ? 1 : 0
-  cluster_policy_id = databricks_cluster_policy.data_analysts.id
-
-  access_control {
-    group_name       = var.admin_group_name
-    permission_level = "CAN_USE"
-  }
-
-  access_control {
-    group_name       = var.data_analysts_group_name
-    permission_level = "CAN_USE"
   }
 }

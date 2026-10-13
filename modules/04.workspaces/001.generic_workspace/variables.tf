@@ -51,13 +51,26 @@ variable "pricing_tier" {
   default     = "ENTERPRISE"
 }
 
-variable "admin_principal_id" {
-  description = "The principal ID of the platform administrators group (assigned ADMIN permissions)."
+variable "admin_group_name" {
+  description = "The name of the platform administrator group (e.g. dbx-platform-admins)."
   type        = string
+  default     = null
+}
+
+variable "user_group_names" {
+  description = "List of user group names (e.g. ['dbx-data-engineers']) granted USER role on the workspace."
+  type        = list(string)
+  default     = []
+}
+
+variable "admin_principal_id" {
+  description = "Deprecated principal ID of the platform administrators group."
+  type        = string
+  default     = null
 }
 
 variable "persona_principal_id" {
-  description = "The principal ID of the persona group (assigned USER permissions)."
+  description = "Deprecated principal ID of the persona group."
   type        = string
   default     = null
 }

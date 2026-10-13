@@ -10,11 +10,11 @@
 - **Purpose & Scope**:
   This module provisions an all-purpose interactive compute cluster (`databricks_cluster`) within an individual Databricks workspace. It strictly enforces upstream policy adherence by requiring a `policy_id` parameter, establishes automatic scaling worker boundaries, configures inactivity auto-termination, and sets up role-based access controls (`databricks_permissions`).
 - **Problem Statement & Solution**:
-  Interactive clusters that lack policy enforcement can lead to configuration drift, oversized worker fleets, and high idle cloud compute costs. This module mandates that every cluster is tied to an upstream cluster policy, guarantees automatic shutdown after an idle period, and configures granular group-level permissions granting `CAN_MANAGE` to platform administrators and `CAN_RESTART` to team members.
+  Interactive clusters that lack policy enforcement can lead to configuration drift, oversized worker fleets, and high idle cloud compute costs. This module mandates that every cluster is tied to an upstream cluster policy, guarantees automatic shutdown after an idle period, and configures granular group-level permissions granting `CAN_MANAGE` to platform administrators and `CAN_RESTART` to authorized user groups.
 - **Key Business & Security Outcomes**:
   - **Enforced Governance**: Guaranteed attachment to a validated cluster policy ID preventing unapproved configurations.
   - **Cost Minimization**: Strict inactivity autotermination and dynamic autoscaling minimize idle EC2 charges.
-  - **RBAC Cluster Security**: Users can restart and attach to clusters without having permission to alter core configurations or node sizes.
+  - **RBAC Cluster Security**: Accepts a list of authorized user groups (`user_group_names`) granted `CAN_RESTART` and `CAN_ATTACH_TO`, while strictly restricting `CAN_MANAGE` to a single platform admin group (`admin_group_name`).
 
 ---
 
@@ -29,9 +29,8 @@
    - `autotermination_minutes`: Idle timeout before automatic shutdown.
    - `custom_tags`: Merges user-defined tags with `ManagedBy = "Terraform"`.
 2. **Access Control List (ACL)**: Creates `databricks_permissions.cluster_permissions`:
-   - `CAN_MANAGE`: Granted to `var.admin_group_name`.
-   - `CAN_RESTART`: Granted to `var.user_group_name` (allowing developers to start/stop the cluster).
-3. **Outputs**: Returns `cluster_id` and `cluster_name`.
+   - `CAN_MANAGE`: Granted to single `var.admin_group_name`.
+   - `CAN_RESTART`: Iterates dynamically over `var.user_group_names` (granting developer groups permission to start/stop and attach to the cluster).
 
 ---
 
@@ -42,7 +41,7 @@
 | Resource Identifier | Resource Type | Description |
 |:---|:---|:---|
 | `databricks_cluster.this` | `databricks_cluster` | All-purpose interactive compute cluster bound to policy |
-| `databricks_permissions.cluster_permissions` | `databricks_permissions` | Access control granting `CAN_MANAGE` to admins and `CAN_RESTART` to users |
+| `databricks_permissions.cluster_permissions` | `databricks_permissions` | Access control granting `CAN_MANAGE` to single admin group and `CAN_RESTART` to user groups |
 
 ---
 
@@ -55,9 +54,8 @@ flowchart TD
     classDef input fill:#ECEFF1,stroke:#37474F,stroke-width:2px,color:#212121;
     classDef compute fill:#FFF3E0,stroke:#E65100,stroke-width:2px,color:#BF360C;
     classDef acl fill:#E8EAF6,stroke:#283593,stroke-width:2px,color:#1A237E;
-    classDef out fill:#E8F5E9,stroke:#2E7D32,stroke-width:2px,color:#1B5E20;
 
-    Inputs["Inputs: cluster_name, spark_version, node_type_id, policy_id, min/max_workers"]:::input
+    Inputs["Inputs: cluster_name, spark_version, node_type_id, policy_id, min/max_workers, admin_group_name, user_group_names"]:::input
 
     subgraph ClusterModule ["002.all_purpose_cluster"]
         Cluster["databricks_cluster.this (Bound to policy_id)"]:::compute
@@ -66,12 +64,7 @@ flowchart TD
         Cluster --> ACL
     end
 
-    OutID["Output: cluster_id"]:::out
-    OutName["Output: cluster_name"]:::out
-
     Inputs --> Cluster
-    Cluster --> OutID
-    Cluster --> OutName
 ```
 
 ---
@@ -91,17 +84,10 @@ flowchart TD
 | `policy_id` | `string` | ID of the cluster policy governing this cluster | Yes |
 | `min_workers` | `number` | Minimum number of autoscaling workers | Yes |
 | `max_workers` | `number` | Maximum number of autoscaling workers | Yes |
-| `admin_group_name` | `string` | Name of the platform admin group (`CAN_MANAGE`) | Yes |
+| `admin_group_name` | `string` | Single platform admin group name (`CAN_MANAGE`) | Yes |
 | `autotermination_minutes` | `number` | Inactivity minutes before auto-shutdown (default: `30`) | No |
-| `user_group_name` | `string` | Name of the persona user group (`CAN_RESTART`) | No |
+| `user_group_names` | `list(string)` | List of group names granted permissions (`CAN_RESTART`) (default: `[]`) | No |
 | `custom_tags` | `map(string)` | Custom tags attached to cluster | No |
-
-### 5.2 Essential Outputs Summary
-
-| Output | Type | Description |
-|:---|:---:|:---|
-| `cluster_id` | `string` | The unique ID of the provisioned cluster |
-| `cluster_name` | `string` | The name of the provisioned cluster |
 
 ---
 

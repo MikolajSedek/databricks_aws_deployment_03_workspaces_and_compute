@@ -8,12 +8,12 @@
 ## 1. Executive Summary
 
 - **Purpose & Scope**:
-  This module provisions a foundational Databricks workspace on AWS via Databricks Multi-Workspace Service (`databricks_mws_workspaces`). It strictly encapsulates workspace infrastructure—cross-account IAM credentials, root S3 storage configuration, customer-managed VPC networking, customer-managed storage KMS key, and Private Access Settings—without coupling compute or cluster resources. It also manages account-level workspace permission assignments (`databricks_mws_permission_assignment`) granting `ADMIN` access to platform administrators and `USER` access to persona groups.
+  This module provisions a foundational Databricks workspace on AWS via Databricks Multi-Workspace Service (`databricks_mws_workspaces`). It strictly encapsulates workspace infrastructure—cross-account IAM credentials, root S3 storage configuration, customer-managed VPC networking, customer-managed storage KMS key, and Private Access Settings—without coupling compute or cluster resources. It also manages account-level workspace permission assignments (`databricks_mws_permission_assignment`) granting `ADMIN` access to platform administrators and `USER` access to authorized user groups.
 - **Problem Statement & Solution**:
   Coupling workspace provisioning directly with clusters, notebooks, or compute policies creates circular dependencies and deployment failures because the workspace API cannot accept compute requests until the workspace URL is fully provisioned and responsive. This module enforces a clean infrastructure boundary by handling only workspace registration and access assignments, cleanly outputting the `workspace_url` for downstream compute orchestrators.
 - **Key Business & Security Outcomes**:
   - **Modular Decoupling**: Pure infrastructure abstraction separating account-level workspace lifecycle from workspace-level compute resources.
-  - **RBAC Governance**: Automatically grants authoritative `ADMIN` role to platform administrators and `USER` role to designated persona groups (Data Engineers, Data Scientists, Data Analysts).
+  - **RBAC Governance**: Automatically grants authoritative `ADMIN` role to platform administrators and `USER` role to designated user groups.
   - **Full PrivateLink Integration**: Enforces private networking and storage KMS encryption at the workspace level.
 
 ---
@@ -27,9 +27,9 @@
    - `network_id`: Customer-managed VPC and PrivateLink endpoints registered in MWS.
    - `storage_customer_managed_key_id`: CMK registered in MWS for root storage encryption.
    - `private_access_settings_id`: Private Access Settings governing console and API routing.
-2. **Platform Admin Assignment**: Executes `databricks_mws_permission_assignment.admins` granting the `ADMIN` role to `var.admin_principal_id`.
-3. **Persona Group Assignment**: If `var.persona_principal_id` is specified, executes `databricks_mws_permission_assignment.persona` granting the `USER` role.
-4. **Outputs**: Exposes `workspace_id`, `workspace_url`, and `workspace_status`.
+2. **Platform Admin Assignment**: Executes `databricks_mws_permission_assignment.admins` granting the `ADMIN` role to `var.admin_group_name`.
+3. **User Group Assignment**: Executes `databricks_mws_permission_assignment.users` granting the `USER` role to `var.user_group_names`.
+4. **Outputs**: Exposes `workspace_url` for downstream compute orchestrators.
 
 ---
 
@@ -41,7 +41,7 @@
 |:---|:---|:---|
 | `databricks_mws_workspaces.this` | `databricks_mws_workspaces` | Databricks E2 workspace linking credentials, storage, network, and KMS |
 | `databricks_mws_permission_assignment.admins` | `databricks_mws_permission_assignment` | Grants `ADMIN` permissions to the platform administrator group |
-| `databricks_mws_permission_assignment.persona` | `databricks_mws_permission_assignment` | Grants `USER` permissions to the persona-specific user group |
+| `databricks_mws_permission_assignment.users` | `databricks_mws_permission_assignment` | Grants `USER` permissions to authorized user groups |
 
 ---
 
@@ -60,20 +60,16 @@ flowchart TD
     subgraph WorkspaceModule ["001.generic_workspace"]
         WS["databricks_mws_workspaces.this"]:::dbx
         AdminRBAC["databricks_mws_permission_assignment.admins (ADMIN)"]:::dbx
-        UserRBAC["databricks_mws_permission_assignment.persona (USER)"]:::dbx
+        UserRBAC["databricks_mws_permission_assignment.users (USER)"]:::dbx
 
         WS --> AdminRBAC
         WS --> UserRBAC
     end
 
-    OutID["Output: workspace_id"]:::out
     OutURL["Output: workspace_url"]:::out
-    OutStatus["Output: workspace_status"]:::out
 
     Inputs --> WS
-    WS --> OutID
     WS --> OutURL
-    WS --> OutStatus
 ```
 
 ---
@@ -95,17 +91,15 @@ flowchart TD
 | `network_id` | `string` | Registered MWS network ID | Yes |
 | `storage_customer_managed_key_id` | `string` | Registered MWS CMK ID for storage encryption | Yes |
 | `private_access_settings_id` | `string` | Registered MWS Private Access Settings ID | Yes |
-| `admin_principal_id` | `string` | Principal ID of the platform administrator group | Yes |
-| `persona_principal_id` | `string` | Principal ID of the persona group (e.g. data engineering) | No |
-| `pricing_tier` | `string` | Pricing tier (`PREMIUM` or `ENTERPRISE`, default: `\"ENTERPRISE\"`) | No |
+| `admin_group_name` | `string` | Platform administrator group name | No |
+| `user_group_names` | `list(string)` | List of user group names granted USER access | No |
+| `pricing_tier` | `string` | Pricing tier (`PREMIUM` or `ENTERPRISE`, default: `"ENTERPRISE"`) | No |
 
 ### 5.2 Essential Outputs Summary
 
 | Output | Type | Description |
 |:---|:---:|:---|
-| `workspace_id` | `string` | The unique ID of the Databricks workspace |
 | `workspace_url` | `string` | Full HTTPS URL of the workspace (e.g. `https://dbc-xxxx.cloud.databricks.com`) |
-| `workspace_status` | `string` | Current lifecycle status of the workspace (e.g. `RUNNING`) |
 
 ---
 

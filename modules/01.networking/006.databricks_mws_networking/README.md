@@ -26,7 +26,7 @@
 2. **Interface VPC Endpoints**: Creates two AWS Interface VPC Endpoints:
    - `aws_vpc_endpoint.backend_rest`: Connects compute planes to Databricks Workspace REST APIs.
    - `aws_vpc_endpoint.backend_relay`: Connects compute nodes to the Databricks Secure Cluster Connectivity (SCC) Relay service.
-3. **MWS Endpoint Registration**: Registers both endpoints in Databricks MWS via `databricks_mws_vpc_endpoint`.
+3. **MWS Endpoint Registration**: Registers both endpoints in Databricks MWS via `databricks_mws_vpc_endpoint` .
 4. **Private Access Settings (PAS)**: Configures `databricks_mws_private_access_settings.pas` establishing access governance (`ACCOUNT` or `ENDPOINT` level).
 5. **Network Registration**: Creates `databricks_mws_networks.this` binding the Spoke VPC, private compute subnets, cluster security groups, and registered PrivateLink endpoints into a single network configuration ID.
 
@@ -125,8 +125,6 @@ flowchart TD
 |:---|:---:|:---|
 | `network_id` | `string` | The unique ID of the Databricks MWS network configuration |
 | `private_access_settings_id` | `string` | The unique ID of the Databricks Private Access Settings |
-| `workspace_vpce_id` | `string` | AWS Interface VPC Endpoint ID for Workspace REST API |
-| `relay_vpce_id` | `string` | AWS Interface VPC Endpoint ID for SCC Relay |
 
 ---
 

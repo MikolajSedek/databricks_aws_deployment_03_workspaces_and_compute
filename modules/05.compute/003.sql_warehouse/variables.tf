@@ -34,26 +34,42 @@ variable "auto_stop_mins" {
 }
 
 variable "warehouse_type" {
-  description = "The type of warehouse: CLASSIC or PRO."
+  description = "The type of warehouse: only 'PRO' is supported (CLASSIC is not permitted)."
   type        = string
   default     = "PRO"
+
+  validation {
+    condition     = var.warehouse_type == "PRO"
+    error_message = "Only 'PRO' warehouse type is supported. CLASSIC is not permitted."
+  }
+}
+
+variable "enable_photon" {
+  description = "Whether Photon engine acceleration is enabled. Must be true for PRO and Serverless SQL warehouses."
+  type        = bool
+  default     = true
+
+  validation {
+    condition     = var.enable_photon == true
+    error_message = "Photon engine acceleration must be enabled (enable_photon = true)."
+  }
 }
 
 variable "enable_serverless_compute" {
-  description = "Whether serverless compute is enabled for this SQL Warehouse."
+  description = "Whether serverless compute is enabled for this SQL Warehouse. Set to true to transition to Serverless SQL once workspace serverless compute prerequisites and terms are enabled."
   type        = bool
   default     = false
 }
 
 variable "admin_group_name" {
-  description = "Group name granted CAN_MANAGE permission."
+  description = "Single platform admin group name granted CAN_MANAGE permission."
   type        = string
 }
 
-variable "user_group_name" {
-  description = "Group name granted CAN_USE permission."
-  type        = string
-  default     = null
+variable "user_group_names" {
+  description = "List of group names granted CAN_USE permission."
+  type        = list(string)
+  default     = []
 }
 
 variable "tags" {
