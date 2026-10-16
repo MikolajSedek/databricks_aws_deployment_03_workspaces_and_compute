@@ -1,7 +1,7 @@
 # AWS KMS Customer Managed Key Module (`001.kms_key`)
 
 [![Terraform](https://img.shields.io/badge/Terraform-%3E%3D1.5.0-623CE4?logo=terraform)](https://developer.hashicorp.com/terraform/docs)
-[![AWS Provider](https://img.shields.io/badge/AWS_Provider-6.66.0-FF9900?logo=amazon-aws)](https://registry.terraform.io/providers/hashicorp/aws/latest/docs)
+[![AWS Provider](https://img.shields.io/badge/AWS_Provider-%3E%3D5.0-FF9900?logo=amazon-aws)](https://registry.terraform.io/providers/hashicorp/aws/latest/docs)
 [![AWS KMS](https://img.shields.io/badge/AWS_Security-KMS%20CMK-FF9900?logo=amazon-aws)](https://docs.aws.amazon.com/kms/latest/developerguide/overview.html)
 
 ---
@@ -29,7 +29,7 @@
 
 ### 2.2 Operational Use Cases
 - **Terraform Remote State**: Passed into [`001.env_backend_bucket`](file:///modules/03.storage/001.env_backend_bucket) to enforce Server-Side Encryption with KMS (SSE-KMS) on the S3 bucket and state objects.
-- **DynamoDB State Locks**: Can be used to encrypt state lock tables.
+- **Workspace Root Storage**: Passed into [`002.databricks_root_bucket`](file:///modules/03.storage/002.databricks_root_bucket) to enforce SSE-KMS on workspace root storage buckets and register the key in Databricks MWS.
 
 ---
 
@@ -50,7 +50,7 @@
 ### 4.1 Level 2: Component Diagram
 
 ```mermaid
-graph TD
+flowchart TD
     classDef input fill:#ECEFF1,stroke:#37474F,stroke-width:2px,color:#212121;
     classDef res fill:#FFF8E1,stroke:#F57F17,stroke-width:1.5px,color:#E65100;
     classDef out fill:#E8F5E9,stroke:#2E7D32,stroke-width:1.5px,color:#1B5E20;
@@ -77,8 +77,9 @@ graph TD
 This module does not invoke any submodules. It provisions native AWS KMS resources directly.
 
 - **Consumers**:
-  - [`001.env_backend_bucket`](file:///modules/03.storage/001.env_backend_bucket) - Uses the resulting KMS Key ARN for S3 server-side encryption.
-  - [`environments/dev`](file:///environments/dev) - Root environment orchestrator instantiating this CMK module.
+  - [`001.env_backend_bucket`](file:///modules/03.storage/001.env_backend_bucket) - Uses the resulting KMS Key ARN for S3 remote state server-side encryption.
+  - [`002.databricks_root_bucket`](file:///modules/03.storage/002.databricks_root_bucket) - Uses workspace-dedicated KMS Key ARNs for root storage bucket encryption and Databricks MWS customer-managed key registration.
+  - [`environments/dev`](file:///environments/dev) - Root environment orchestrator instantiating this CMK module for state persistence and per-workspace root storage keys.
 
 ---
 
@@ -116,4 +117,5 @@ This module does not invoke any submodules. It provisions native AWS KMS resourc
 ### 7.2 Internal References
 - [Terraform Contract (`TERRAFORM.md`)](./TERRAFORM.md)
 - [Remote Backend Bucket Module (`001.env_backend_bucket`)](file:///modules/03.storage/001.env_backend_bucket)
+- [Databricks Root Storage Bucket Module (`002.databricks_root_bucket`)](file:///modules/03.storage/002.databricks_root_bucket)
 - [Authoritative README Template](file:///.ai/README_TEMPLATE.md)

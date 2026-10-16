@@ -1,7 +1,7 @@
 # Remote Terraform S3 Backend Bucket Module (`001.env_backend_bucket`)
 
 [![Terraform](https://img.shields.io/badge/Terraform-%3E%3D1.5.0-623CE4?logo=terraform)](https://developer.hashicorp.com/terraform/docs)
-[![AWS Provider](https://img.shields.io/badge/AWS_Provider-6.66.0-FF9900?logo=amazon-aws)](https://registry.terraform.io/providers/hashicorp/aws/latest/docs)
+[![AWS Provider](https://img.shields.io/badge/AWS_Provider-%3E%3D5.0-FF9900?logo=amazon-aws)](https://registry.terraform.io/providers/hashicorp/aws/latest/docs)
 [![Amazon S3](https://img.shields.io/badge/AWS_Storage-Amazon%20S3-569A31?logo=amazon-aws)](https://docs.aws.amazon.com/AmazonS3/latest/userguide/Welcome.html)
 
 ---
@@ -26,7 +26,7 @@
 1. **Bucket Initialization**: Creates `aws_s3_bucket.this` formatted as `${var.bucket_name}-${var.environment}`.
 2. **Ownership Controls**: Applies `aws_s3_bucket_ownership_controls.this` setting `object_ownership = "BucketOwnerEnforced"` (disabling legacy S3 ACLs).
 3. **Public Access Hardening**: Applies `aws_s3_bucket_public_access_block.this` blocking all public ACLs, policies, and queries.
-4. **Versioning Activation**: Enables multi-version state tracking via `aws_s3_bucket_versioning.this`.\
+4. **Versioning Activation**: Enables multi-version state tracking via `aws_s3_bucket_versioning.this`.
 5. **KMS Encryption Enforcement**: Configures `aws_s3_bucket_server_side_encryption_configuration.this` utilizing the provided `kms_key_arn` and enabling bucket key optimization.
 6. **Lifecycle Management**: Configures `aws_s3_bucket_lifecycle_configuration.this` with rule `cleanup-old-state-versions`, expiring non-current historical versions after 90 days.
 
@@ -54,7 +54,7 @@ Terraform CLI and CI/CD pipelines authenticate with AWS, assume the target deplo
 ### 4.1 Level 2: Storage Container Diagram
 
 ```mermaid
-graph TD
+flowchart TD
     classDef input fill:#ECEFF1,stroke:#37474F,stroke-width:2px,color:#212121;
     classDef s3 fill:#E8F5E9,stroke:#2E7D32,stroke-width:1.5px,color:#1B5E20;
     classDef sec fill:#FFF8E1,stroke:#F57F17,stroke-width:1.5px,color:#E65100;
@@ -80,6 +80,9 @@ graph TD
 ## 5. All Modules Used with Short Summaries
 
 This module does not invoke external submodules. It provisions native Amazon S3 bucket resources and security policies directly.
+
+- **Consumers**:
+  - [`environments/dev`](file:///environments/dev) - Root environment orchestrator instantiating this remote state storage module.
 
 ---
 

@@ -12,7 +12,7 @@
 - **Problem Statement & Solution**:
   Running general-purpose all-purpose clusters for BI queries and ad-hoc dashboards results in slow query startup, sub-optimal SQL caching, and excessive DBU burn. SQL Warehouses provide specialized T-shirt sized SQL execution engines (`2X-Small` to `4X-Large`) optimized for BI tools (Power BI, Tableau) and Lakeview dashboards, complete with instant query caching and auto-stop capabilities.
 - **Key Business & Security Outcomes**:
-  - **Inactivity Protection**: Automatically suspends warehouses after a configurable idle threshold (e.g., 15 minutes) to eliminate runaway compute costs.
+  - **Inactivity Protection**: Automatically suspends warehouses after a configurable idle threshold (e.g., 10 or 15 minutes) to eliminate runaway compute costs.
   - **Elastic Concurrency**: Supports multi-cluster horizontal autoscaling (`min_num_clusters` to `max_num_clusters`) to accommodate peak reporting demands without query queueing.
   - **Engine Performance**: Enforces the high-performance **PRO** warehouse type with **Photon** acceleration enabled.
   - **Future-Proof Serverless Transition**: Pre-wired with `enable_serverless_compute` (default `false`) allowing immediate zero-downtime transition to Serverless SQL once workspace serverless terms and networking prerequisites are accepted.
@@ -61,7 +61,7 @@ flowchart TD
     Inputs["Inputs: name, cluster_size, min/max_clusters, auto_stop_mins, admin_group_name, user_group_names"]:::input
 
     subgraph WarehouseModule ["003.sql_warehouse"]
-        WH["databricks_sql_endpoint.this<br/>(PRO + Photon)"]:::compute
+        WH["databricks_sql_endpoint.this (PRO + Photon)"]:::compute
         ACL["databricks_permissions.warehouse_permissions"]:::acl
 
         WH --> ACL
@@ -72,12 +72,45 @@ flowchart TD
 
 ---
 
-## 5. Terraform Documentation Interface
+## 5. All Modules Used with Short Summaries
+
+This module does not invoke external submodules. It provisions native Databricks SQL Warehouse endpoints and object permissions directly within the target workspace.
+
+- **Consumers**:
+  - [`004.workspace_compute`](file:///modules/05.compute/004.workspace_compute) - Workspace compute orchestrator invoking this module via `for_each` across defined SQL Warehouse configurations.
+
+---
+
+## 6. Terraform Documentation Interface
 
 > [!NOTE]
 > Machine-generated interface specifications for this module are maintained by `terraform-docs` in [`TERRAFORM.md`](./TERRAFORM.md).
 
-### 5.1 Essential Inputs Summary
+### 6.1 Essential Inputs Summary
 
 | Variable | Type | Description | Required |
-|:---|:---:|:---|:---:|\n| `name` | `string` | Name of the SQL Warehouse | Yes |\n| `admin_group_name` | `string` | Single platform admin group name (`CAN_MANAGE`) | Yes |\n| `cluster_size` | `string` | T-shirt size (`2X-Small`, `X-Small`, `Small`, etc., default: `"2X-Small"`) | No |\n| `min_num_clusters` | `number` | Minimum number of clusters (default: `1`) | No |\n| `max_num_clusters` | `number` | Maximum number of clusters for autoscaling (default: `1`) | No |\n| `auto_stop_mins` | `number` | Inactivity minutes before automatic suspension (default: `15`) | No |\n| `warehouse_type` | `string` | Warehouse engine type: only `"PRO"` is supported (default: `"PRO"`) | No |\n| `enable_photon` | `bool` | Whether Photon acceleration is enabled (enforced `true`, default: `true`) | No |\n| `enable_serverless_compute` | `bool` | Enable Serverless compute backend (default: `false`) | No |\n| `user_group_names` | `list(string)` | List of user group names granted access (`CAN_USE`) (default: `[]`) | No |\n| `tags` | `map(string)` | Tags attached to warehouse | No |\n\n---\n\n## 6. Important Links and References\n\n- [Databricks SQL Warehouses Reference](https://docs.databricks.com/aws/en/sql/admin/sql-endpoints)\n- [Databricks SQL Endpoint Resource Documentation](https://registry.terraform.io/providers/databricks/databricks/latest/docs/resources/sql_endpoint)\n- [Databricks Permissions Resource Documentation](https://registry.terraform.io/providers/databricks/databricks/latest/docs/resources/permissions)\n- [Terraform Documentation Interface (`TERRAFORM.md`)](./TERRAFORM.md)\n
+|:---|:---:|:---|:---:|
+| `name` | `string` | Name of the SQL Warehouse | Yes |
+| `admin_group_name` | `string` | Single platform admin group name (`CAN_MANAGE`) | Yes |
+| `cluster_size` | `string` | T-shirt size (`2X-Small`, `X-Small`, `Small`, etc., default: `\"2X-Small\"`) | No |
+| `min_num_clusters` | `number` | Minimum number of clusters (default: `1`) | No |
+| `max_num_clusters` | `number` | Maximum number of clusters for autoscaling (default: `1`) | No |
+| `auto_stop_mins` | `number` | Inactivity minutes before automatic suspension (default: `15`) | No |
+| `warehouse_type` | `string` | Warehouse engine type: only `\"PRO\"` is supported (default: `\"PRO\"`) | No |
+| `enable_photon` | `bool` | Whether Photon acceleration is enabled (enforced `true`, default: `true`) | No |
+| `enable_serverless_compute` | `bool` | Enable Serverless compute backend (default: `false`) | No |
+| `user_group_names` | `list(string)` | List of user group names granted access (`CAN_USE`) (default: `[]`) | No |
+| `tags` | `map(string)` | Tags attached to warehouse | No |
+
+### 6.2 Essential Outputs Summary
+
+No outputs are exported by this module. SQL Warehouses are provisioned and managed directly as internal workspace compute endpoints.
+
+---
+
+## 7. Important Links and References
+
+- [Databricks SQL Warehouses Reference](https://docs.databricks.com/aws/en/sql/admin/sql-endpoints)
+- [Databricks SQL Endpoint Resource Documentation](https://registry.terraform.io/providers/databricks/databricks/latest/docs/resources/sql_endpoint)
+- [Databricks Permissions Resource Documentation](https://registry.terraform.io/providers/databricks/databricks/latest/docs/resources/permissions)
+- [Terraform Documentation Interface (`TERRAFORM.md`)](./TERRAFORM.md)

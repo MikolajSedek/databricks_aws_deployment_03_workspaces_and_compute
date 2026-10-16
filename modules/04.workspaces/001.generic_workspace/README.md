@@ -8,13 +8,13 @@
 ## 1. Executive Summary
 
 - **Purpose & Scope**:
-  This module provisions a foundational Databricks workspace on AWS via Databricks Multi-Workspace Service (`databricks_mws_workspaces`). It strictly encapsulates workspace infrastructure—cross-account IAM credentials, root S3 storage configuration, customer-managed VPC networking, customer-managed storage KMS key, and Private Access Settings—without coupling compute or cluster resources. It also manages account-level workspace permission assignments (`databricks_mws_permission_assignment`) granting `ADMIN` access to platform administrators and `USER` access to authorized user groups.
+  This module provisions a foundational Databricks workspace on AWS via Databricks Multi-Workspace Service (`databricks_mws_workspaces`). It strictly encapsulates workspace infrastructure—cross-account IAM credentials, root S3 storage configuration, customer-managed VPC networking, and customer-managed storage KMS key—without coupling compute or cluster resources. It also manages account-level workspace permission assignments (`databricks_mws_permission_assignment`) granting `ADMIN` access to platform administrators and `USER` access to authorized user groups.
 - **Problem Statement & Solution**:
   Coupling workspace provisioning directly with clusters, notebooks, or compute policies creates circular dependencies and deployment failures because the workspace API cannot accept compute requests until the workspace URL is fully provisioned and responsive. This module enforces a clean infrastructure boundary by handling only workspace registration and access assignments, cleanly outputting the `workspace_url` for downstream compute orchestrators.
 - **Key Business & Security Outcomes**:
   - **Modular Decoupling**: Pure infrastructure abstraction separating account-level workspace lifecycle from workspace-level compute resources.
-  - **RBAC Governance**: Automatically grants authoritative `ADMIN` role to platform administrators and `USER` role to designated user groups.
-  - **Full PrivateLink Integration**: Enforces private networking and storage KMS encryption at the workspace level.
+  - **RBAC Governance**: Automatically grants authoritative `ADMIN` role to platform administrators and `USER` role to designated persona user groups.
+  - **Encryption & VPC Binding**: Binds customer-managed VPC and dedicated customer-managed storage KMS keys at the workspace level.
 
 ---
 
@@ -24,9 +24,8 @@
 1. **Workspace Instantiation**: Calls `databricks_mws_workspaces.this` binding all prerequisite configuration IDs:
    - `credentials_id`: Cross-account IAM role registered in MWS.
    - `storage_configuration_id`: S3 root storage bucket registered in MWS.
-   - `network_id`: Customer-managed VPC and PrivateLink endpoints registered in MWS.
+   - `network_id`: Customer-managed VPC registered in MWS.
    - `storage_customer_managed_key_id`: CMK registered in MWS for root storage encryption.
-   - `private_access_settings_id`: Private Access Settings governing console and API routing.
 2. **Platform Admin Assignment**: Executes `databricks_mws_permission_assignment.admins` granting the `ADMIN` role to `var.admin_group_name`.
 3. **User Group Assignment**: Executes `databricks_mws_permission_assignment.users` granting the `USER` role to `var.user_group_names`.
 4. **Outputs**: Exposes `workspace_url` for downstream compute orchestrators.
@@ -55,7 +54,7 @@ flowchart TD
     classDef dbx fill:#FFEBEE,stroke:#C62828,stroke-width:2px,color:#B71C1C;
     classDef out fill:#E8F5E9,stroke:#2E7D32,stroke-width:2px,color:#1B5E20;
 
-    Inputs["Prerequisites: credentials_id, storage_config_id, network_id, cmk_id, pas_id"]:::input
+    Inputs["Prerequisites: credentials_id, storage_config_id, network_id, cmk_id"]:::input
 
     subgraph WorkspaceModule ["001.generic_workspace"]
         WS["databricks_mws_workspaces.this"]:::dbx
@@ -74,12 +73,22 @@ flowchart TD
 
 ---
 
-## 5. Terraform Documentation Interface
+## 5. All Modules Used with Short Summaries
+
+This module does not invoke external submodules. It provisions Databricks MWS workspaces and account permission assignments directly using the account-level provider (`databricks.mws`).
+
+- **Consumers**:
+  - [`004.workspace_compute`](file:///modules/05.compute/004.workspace_compute) - Uses `workspace_url` to target workspace-scoped provider operations for compute clusters, SQL Warehouses, and policies.
+  - [`environments/dev`](file:///environments/dev) - Root environment orchestrator instantiating this module per persona workspace.
+
+---
+
+## 6. Terraform Documentation Interface
 
 > [!NOTE]
 > Machine-generated interface specifications for this module are maintained by `terraform-docs` in [`TERRAFORM.md`](./TERRAFORM.md).
 
-### 5.1 Essential Inputs Summary
+### 6.1 Essential Inputs Summary
 
 | Variable | Type | Description | Required |
 |:---|:---:|:---|:---:|
@@ -90,12 +99,11 @@ flowchart TD
 | `storage_configuration_id` | `string` | Registered MWS storage configuration ID | Yes |
 | `network_id` | `string` | Registered MWS network ID | Yes |
 | `storage_customer_managed_key_id` | `string` | Registered MWS CMK ID for storage encryption | Yes |
-| `private_access_settings_id` | `string` | Registered MWS Private Access Settings ID | Yes |
 | `admin_group_name` | `string` | Platform administrator group name | No |
 | `user_group_names` | `list(string)` | List of user group names granted USER access | No |
-| `pricing_tier` | `string` | Pricing tier (`PREMIUM` or `ENTERPRISE`, default: `"ENTERPRISE"`) | No |
+| `pricing_tier` | `string` | Pricing tier (`PREMIUM` or `ENTERPRISE`, default: `\"ENTERPRISE\"`) | No |
 
-### 5.2 Essential Outputs Summary
+### 6.2 Essential Outputs Summary
 
 | Output | Type | Description |
 |:---|:---:|:---|
@@ -103,7 +111,7 @@ flowchart TD
 
 ---
 
-## 6. Important Links and References
+## 7. Important Links and References
 
 - [Databricks Workspaces Resource Documentation](https://registry.terraform.io/providers/databricks/databricks/latest/docs/resources/mws_workspaces)
 - [Databricks Permission Assignment Resource Documentation](https://registry.terraform.io/providers/databricks/databricks/latest/docs/resources/mws_permission_assignment)

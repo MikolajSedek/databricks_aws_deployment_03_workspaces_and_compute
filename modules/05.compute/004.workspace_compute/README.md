@@ -22,20 +22,20 @@
 
 ### 2.1 Provisioning Lifecycle
 1. **Compute Policies Deployment**: Instantiates `module.compute_policies` creating the Platform Admin policy (max 25 DBU) and Shared Workspace policy.
-2. **Cluster Fleet Provisioning**: Uses `for_each = var.clusters` to invoke `module.clusters`, binding each cluster to `module.compute_policies.shared_policy_id`.
-3. **SQL Warehouses Provisioning**: Uses `for_each = var.sql_warehouses` to invoke `module.sql_warehouses`, configuring T-shirt sizing and inactivity auto-stop.
+2. **Cluster Fleet Provisioning**: Uses `for_each = var.clusters` to invoke `module.clusters`, binding each cluster to `module.compute_policies.shared_policy_id` (or custom `policy_id`), setting runtime engine, elastic disk, and Unity Catalog access mode (`data_security_mode = "USER_ISOLATION"`).
+3. **SQL Warehouses Provisioning**: Uses `for_each = var.sql_warehouses` to invoke `module.sql_warehouses`, configuring T-shirt sizing, Photon acceleration, and inactivity auto-stop.
 
 ---
 
 ## 3. Architecture of the Module
 
-### 3.1 Submodules Invoked
+### 3.1 Composite Architecture Breakdown
 
-| Submodule | Source | Role & Responsibility |
+| Component Layer | Invoked Submodule | Key Deliverables & Enforcements |
 |:---|:---|:---|
-| `module.compute_policies` | `../001.compute_policies` | Creates capped admin policy and shared workspace policy |
-| `module.clusters` | `../002.all_purpose_cluster` | Instantiates policy-bound interactive clusters via `for_each` |
-| `module.sql_warehouses` | `../003.sql_warehouse` | Instantiates auto-stopping SQL Warehouses via `for_each` |
+| **Governance Layer** | [`001.compute_policies`](file:///modules/05.compute/001.compute_policies) | Platform Admin policy (<=25 DBU/hr) and Shared Workspace policy (<=15 DBU/hr) |
+| **Interactive Compute** | [`002.all_purpose_cluster`](file:///modules/05.compute/002.all_purpose_cluster) | Policy-bound autoscaling clusters with elastic disk and `USER_ISOLATION` |
+| **Analytics Compute** | [`003.sql_warehouse`](file:///modules/05.compute/003.sql_warehouse) | PRO SQL Warehouses with Photon acceleration and auto-stop |
 
 ---
 
@@ -63,12 +63,25 @@ flowchart TD
 
 ---
 
-## 5. Terraform Documentation Interface
+## 5. All Modules Used with Short Summaries
+
+This composite module delegates directly to the following specialized submodules:
+
+- [`001.compute_policies`](file:///modules/05.compute/001.compute_policies) - Creates the capped Platform Admin policy (max 25 DBU) and Shared Workspace policy (max 15 DBU) with group ACLs.
+- [`002.all_purpose_cluster`](file:///modules/05.compute/002.all_purpose_cluster) - Provisions policy-bound autoscaling interactive compute clusters.
+- [`003.sql_warehouse`](file:///modules/05.compute/003.sql_warehouse) - Provisions PRO SQL Warehouses with Photon acceleration and inactivity auto-stop.
+
+- **Consumers**:
+  - [`environments/dev`](file:///environments/dev) - Root environment orchestrator instantiating this composite compute module per persona workspace.
+
+---
+
+## 6. Terraform Documentation Interface
 
 > [!NOTE]
 > Machine-generated interface specifications for this module are maintained by `terraform-docs` in [`TERRAFORM.md`](./TERRAFORM.md).
 
-### 5.1 Essential Inputs Summary
+### 6.1 Essential Inputs Summary
 
 | Variable | Type | Description | Required |
 |:---|:---:|:---|:---:|
@@ -78,9 +91,13 @@ flowchart TD
 | `clusters` | `map(object)` | Map of compute cluster configuration objects | No |
 | `sql_warehouses` | `map(object)` | Map of SQL Warehouse endpoint configuration objects | No |
 
+### 6.2 Essential Outputs Summary
+
+No outputs are exported by this composite module. All child resources are provisioned directly within the target Databricks workspace.
+
 ---
 
-## 6. Important Links and References
+## 7. Important Links and References
 
 - [Compute Policies Module (`001.compute_policies`)](file:///modules/05.compute/001.compute_policies)
 - [All-Purpose Cluster Module (`002.all_purpose_cluster`)](file:///modules/05.compute/002.all_purpose_cluster)

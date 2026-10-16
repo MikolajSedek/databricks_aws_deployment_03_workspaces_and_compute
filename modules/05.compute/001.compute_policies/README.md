@@ -83,19 +83,28 @@ flowchart TD
 
 ---
 
-## 5. Terraform Documentation Interface
+## 5. All Modules Used with Short Summaries
+
+This module does not invoke external submodules. It provisions native Databricks cluster policy and permissions resources directly within the target workspace.
+
+- **Consumers**:
+  - [`004.workspace_compute`](file:///modules/05.compute/004.workspace_compute) - Orchestrator module that invokes this policy module and binds the resulting `shared_policy_id` to compute clusters.
+
+---
+
+## 6. Terraform Documentation Interface
 
 > [!NOTE]
 > Machine-generated interface specifications for this module are maintained by `terraform-docs` in [`TERRAFORM.md`](./TERRAFORM.md).
 
-### 5.1 Essential Inputs Summary
+### 6.1 Essential Inputs Summary
 
 | Variable | Type | Description | Required |
 |:---|:---:|:---|:---:|
 | `admin_group_name` | `string` | Name of the platform admin group granted policy access | Yes |
 | `user_group_names` | `list(string)` | List of user group names granted CAN_USE permission | No |
 
-### 5.2 Essential Outputs Summary
+### 6.2 Essential Outputs Summary
 
 | Output | Type | Description |
 |:---|:---:|:---|
@@ -103,7 +112,7 @@ flowchart TD
 
 ---
 
-## 6. Important Links and References
+## 7. Important Links and References
 
 - [Databricks Cluster Policy Reference](https://docs.databricks.com/aws/en/admin/clusters/policies)
 - [Databricks Cluster Policy Resource Documentation](https://registry.terraform.io/providers/databricks/databricks/latest/docs/resources/cluster_policy)

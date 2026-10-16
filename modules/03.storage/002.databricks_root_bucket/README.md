@@ -33,7 +33,7 @@
    - `aws_kms_grant.databricks_storage` (for Databricks E2 control plane).
    - `aws_kms_grant.cross_account_role` (for compute cluster worker nodes).
 6. **MWS Registrations**:
-   - Registers the CMK in MWS via `databricks_mws_customer_managed_keys.this` (`use_cases = ["STORAGE"]`).
+   - Registers the CMK in MWS via `databricks_mws_customer_managed_keys.storage_cmk` (`use_cases = ["STORAGE"]`).
    - Registers the S3 bucket in MWS via `databricks_mws_storage_configurations.this`.
 
 ---
@@ -52,7 +52,7 @@
 | `aws_s3_bucket_policy.root_bucket` | `aws_s3_bucket_policy` | Databricks canonical root bucket policy |
 | `aws_kms_grant.databricks_storage` | `aws_kms_grant` | Decryption/encryption grant for Databricks storage service |
 | `aws_kms_grant.cross_account_role` | `aws_kms_grant` | Decryption/encryption grant for compute cross-account role |
-| `databricks_mws_customer_managed_keys.this` | `databricks_mws_customer_managed_keys` | MWS customer-managed key registration for storage |
+| `databricks_mws_customer_managed_keys.storage_cmk` | `databricks_mws_customer_managed_keys` | MWS customer-managed key registration for storage |
 | `databricks_mws_storage_configurations.this` | `databricks_mws_storage_configurations` | MWS root storage registration linking bucket name |
 
 ---
@@ -88,7 +88,7 @@ flowchart TD
     end
 
     subgraph MWSRegistration ["Databricks MWS Registrations"]
-        MWS_CMK["databricks_mws_customer_managed_keys.this"]:::dbx
+        MWS_CMK["databricks_mws_customer_managed_keys.storage_cmk"]:::dbx
         MWS_Storage["databricks_mws_storage_configurations.this"]:::dbx
     end
 
@@ -105,12 +105,22 @@ flowchart TD
 
 ---
 
-## 5. Terraform Documentation Interface
+## 5. All Modules Used with Short Summaries
+
+This module does not invoke external submodules. It provisions AWS S3 and KMS resources directly and registers them via the account-level Databricks provider (`databricks.mws`).
+
+- **Consumers**:
+  - [`001.generic_workspace`](file:///modules/04.workspaces/001.generic_workspace) - Consumes `storage_configuration_id` and `customer_managed_key_id` to link root storage to Databricks workspaces.
+  - [`environments/dev`](file:///environments/dev) - Root environment orchestrator instantiating dedicated root buckets per persona workspace.
+
+---
+
+## 6. Terraform Documentation Interface
 
 > [!NOTE]
 > Machine-generated interface specifications for this module are maintained by `terraform-docs` in [`TERRAFORM.md`](./TERRAFORM.md).
 
-### 5.1 Essential Inputs Summary
+### 6.1 Essential Inputs Summary
 
 | Variable | Type | Description | Required |
 |:---|:---:|:---|:---:|
@@ -121,18 +131,18 @@ flowchart TD
 | `cross_account_role_arn` | `string` | ARN of the cross-account IAM role | Yes |
 | `force_destroy` | `bool` | Allow force destroying bucket objects on delete (default: `false`) | No |
 
-### 5.2 Essential Outputs Summary
+### 6.2 Essential Outputs Summary
 
 | Output | Type | Description |
 |:---|:---:|:---|
 | `storage_configuration_id` | `string` | The unique ID of the Databricks MWS storage configuration |
-| `customer_managed_key_id` | `string` | The Databricks MWS customer-managed key ID |
+| `customer_managed_key_id` | `string` | The Databricks MWS customer-managed key ID for storage encryption |
 
 ---
 
-## 6. Important Links and References
+## 7. Important Links and References
 
-- [Databricks S3 Storage Requirements](https://docs.databricks.com/aws/en/administration-guide/account-settings-e2/storage)
+- [Databricks S3 Storage Requirements](https://docs.databricks.com/aws/en/admin/cloud-configurations/aws/storage)
 - [Databricks Customer-Managed Keys for Storage](https://docs.databricks.com/aws/en/security/keys/customer-managed-keys-storage-aws)
 - [Databricks MWS Storage Configurations Resource Documentation](https://registry.terraform.io/providers/databricks/databricks/latest/docs/resources/mws_storage_configurations)
 - [Terraform Documentation Interface (`TERRAFORM.md`)](./TERRAFORM.md)

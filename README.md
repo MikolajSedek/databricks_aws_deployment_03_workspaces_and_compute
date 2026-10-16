@@ -14,12 +14,12 @@
   This repository orchestrates the enterprise-grade deployment of **Databricks E2 multi-workspace architecture and governed compute infrastructure** on Amazon Web Services (AWS). It establishes dedicated, logically isolated Databricks workspaces for three core analytics personas—**Data Engineering**, **Data Science**, and **Data Analytics**—within a customer-managed AWS VPC environment.
 - **Problem Statement & Solution**:
   Deploying multi-tenant Databricks environments without strict boundaries leads to resource contention, cost overruns from oversized interactive clusters, and shared credential risks. This project addresses these challenges by implementing:
-  - **Account-Level Automation**: Automatic provisioning of cross-account IAM roles, AWS PrivateLink interface endpoints, dedicated customer-managed KMS encryption keys, and S3 root storage buckets registered with Databricks Multi-Workspace Service (MWS).
+  - **Account-Level Automation**: Automatic provisioning of cross-account IAM roles, customer-managed VPC network registration, dedicated customer-managed KMS encryption keys, and S3 root storage buckets registered with Databricks Multi-Workspace Service (MWS).
   - **Persona-Isolated Workspaces**: Discrete workspaces tailored to operational personas with role-based access control (RBAC).
   - **Strict Compute Governance**: Enforced cluster policies—featuring a hard **25 DBU/hour budget cap** for platform administrators and a **15 DBU/hour cap** on shared workspace compute, paired with workload-tailored clusters and auto-stopping SQL Warehouses.
 - **Key Business & Security Outcomes**:
   - **End-to-End Encryption**: Dedicated Customer-Managed Keys (CMK) with annual rotation encrypting Terraform state, S3 root storage buckets, and DBFS storage.
-  - **Network Isolation**: Complete PrivateLink connectivity for Workspace REST APIs and Secure Cluster Connectivity (SCC) Relay traffic.
+  - **Network Isolation**: Compute plane execution strictly inside private subnets of a customer-managed VPC with PrivateLink connectivity.
   - **Cost Predictability**: Cluster policies prevent provisioning unbounded or unapproved EC2 instance families, while SQL Warehouses automatically stop after idle timeout thresholds.
   - **Modular Architecture**: 10 decoupled, reusable Terraform modules adhering to clean separation of concerns between account-level control plane and workspace-level data plane resources.
 
@@ -43,7 +43,7 @@ Project 01 (Networking)           Project 02 (Identities)
  │                                                                        │
  │  1. KMS CMK & S3 Remote State Backend (modules/02.security, 03.storage)│
  │  2. Cross-Account IAM Role & MWS Credentials (modules/02.security)     │
- │  3. PrivateLink VPCEs & MWS Network Config (modules/01.networking)    │
+ │  3. Customer VPC MWS Network Registration (modules/01.networking)      │
  │  4. Workspace KMS CMKs & S3 Root Storage (modules/02.security, storage)│
  │  5. Generic MWS Workspaces & Group Access (modules/04.workspaces)      │
  └───────────────────────────────────┬────────────────────────────────────┘
@@ -60,9 +60,9 @@ Project 01 (Networking)           Project 02 (Identities)
 ```
 
 ### 2.2 Traffic & Network Connectivity
-1. **Control Plane to Data Plane (SCC Relay)**: Clusters initiate outbound TLS connections over port `6666` via the AWS PrivateLink Interface Endpoint (`relay_vpce`), ensuring worker nodes require zero public IP addresses or inbound Internet access.
-2. **REST API & Management**: Workspace management operations connect through the private REST interface VPC endpoint (`workspace_vpce`) on port `443`.
-3. **Storage Access**: Compute clusters access the dedicated workspace S3 root bucket using IAM instance profiles and customer-managed KMS key decryption grants.
+1. **Control Plane to Data Plane (SCC Relay)**: Clusters initiate outbound TLS connections over port `6666` via the AWS PrivateLink Interface Endpoint in the Spoke VPC, ensuring worker nodes require zero public IP addresses or inbound Internet access.
+2. **REST API & Management**: Workspace management operations connect through the private REST interface VPC endpoint on port `443`.
+3. **Storage Access**: Compute clusters access dedicated workspace S3 root buckets using IAM instance profiles and customer-managed KMS key decryption grants.
 
 ---
 
@@ -85,7 +85,7 @@ Project 01 (Networking)           Project 02 (Identities)
 │       └── README.md                    # Environment-specific deployment manual
 └── modules/
     ├── 01.networking/
-    │   └── 006.databricks_mws_networking/  # AWS PrivateLink VPCEs, PAS & MWS Network
+    │   └── 006.databricks_mws_networking/  # Customer-managed VPC registration in Databricks MWS
     ├── 02.security/
     │   ├── 001.kms_key/                    # Customer-Managed Key (CMK) with annual rotation
     │   └── 002.cross_account_role/         # Databricks cross-account IAM role + credentials
@@ -105,15 +105,15 @@ Project 01 (Networking)           Project 02 (Identities)
 
 | Module Path | Primary Resources | Key Deliverables |
 |:---|:---|:---|
-| [`modules/01.networking/006.databricks_mws_networking`](file:///modules/01.networking/006.databricks_mws_networking) | `aws_vpc_endpoint`, `aws_security_group`, `databricks_mws_networks`, `databricks_mws_private_access_settings` | Dual PrivateLink VPCEs (REST/Relay), VPCE security group, PAS, and Databricks network registration |
+| [`modules/01.networking/006.databricks_mws_networking`](file:///modules/01.networking/006.databricks_mws_networking) | `databricks_mws_networks` | Customer-managed Spoke VPC network registration in Databricks MWS |
 | [`modules/02.security/001.kms_key`](file:///modules/02.security/001.kms_key) | `aws_kms_key`, `aws_kms_key_policy`, `aws_kms_alias` | Hardened customer-managed KMS key with annual rotation and IAM delegation |
 | [`modules/02.security/002.cross_account_role`](file:///modules/02.security/002.cross_account_role) | `aws_iam_role`, `aws_iam_policy`, `time_sleep`, `databricks_mws_credentials` | Cross-account role, assume role policy with External ID, 30s STS propagation sleep, MWS credentials |
 | [`modules/03.storage/001.env_backend_bucket`](file:///modules/03.storage/001.env_backend_bucket) | `aws_s3_bucket`, `aws_s3_bucket_server_side_encryption_configuration`, `aws_s3_bucket_public_access_block` | S3 remote state backend bucket with SSE-KMS, versioning, and public access blocks |
 | [`modules/03.storage/002.databricks_root_bucket`](file:///modules/03.storage/002.databricks_root_bucket) | `aws_s3_bucket`, `aws_s3_bucket_policy`, `databricks_mws_customer_managed_keys`, `databricks_mws_storage_configurations` | Workspace root storage bucket, Databricks bucket policy, CMK registration, and MWS storage configuration |
 | [`modules/04.workspaces/001.generic_workspace`](file:///modules/04.workspaces/001.generic_workspace) | `databricks_mws_workspaces`, `databricks_mws_permission_assignment` | Encapsulated workspace provisioning linking credentials, storage, network, and KMS; group RBAC assignments |
 | [`modules/05.compute/001.compute_policies`](file:///modules/05.compute/001.compute_policies) | `databricks_cluster_policy`, `databricks_permissions` | Capped Platform Admin policy (<=25 DBU cap) and Workspace Shared policy (<=15 DBU cap) with group ACLs |
-| [`modules/05.compute/002.all_purpose_cluster`](file:///modules/05.compute/002.all_purpose_cluster) | `databricks_cluster`, `databricks_permissions` | Policy-bound autoscaling interactive clusters with autotermination and permissions |
-| [`modules/05.compute/003.sql_warehouse`](file:///modules/05.compute/003.sql_warehouse) | `databricks_sql_endpoint`, `databricks_permissions` | Serverless/Pro SQL Warehouses with configurable auto-stop and group access controls |
+| [`modules/05.compute/002.all_purpose_cluster`](file:///modules/05.compute/002.all_purpose_cluster) | `databricks_cluster`, `databricks_permissions` | Policy-bound autoscaling interactive clusters with autotermination, elastic disk, and permissions |
+| [`modules/05.compute/003.sql_warehouse`](file:///modules/05.compute/003.sql_warehouse) | `databricks_sql_endpoint`, `databricks_permissions` | PRO SQL Warehouses with configurable auto-stop and group access controls |
 | [`modules/05.compute/004.workspace_compute`](file:///modules/05.compute/004.workspace_compute) | Composite (`001`, `002`, `003` submodules) | Single unified workspace compute instantiation supporting multiple clusters and SQL endpoints per workspace |
 
 ---
@@ -142,7 +142,7 @@ flowchart TD
     subgraph AWSCloud ["Customer AWS Account (VPC & IAM)"]
         subgraph AccountPlane ["Account-Level Foundation"]
             CrossAccountRole["Cross-Account IAM Role"]:::aws
-            VPCEndpoints["AWS PrivateLink Interface Endpoints"]:::aws
+            MWSNetwork["MWS VPC Network Registration"]:::aws
             KMSKeys["Customer-Managed KMS Keys"]:::aws
             RootBuckets["S3 Root Storage Buckets"]:::aws
         end
@@ -160,10 +160,10 @@ flowchart TD
     DataAnalyst -->|"SQL & Dashboards"| WS_DA
 
     MWSAccount -->|"Assumes Role"| CrossAccountRole
-    ControlPlane <-->|"PrivateLink (Ports 443 & 6666)"| VPCEndpoints
-    VPCEndpoints --> WorkspacesPlane
+    MWSNetwork --> WorkspacesPlane
     KMSKeys --> WorkspacesPlane
     RootBuckets --> WorkspacesPlane
+    ControlPlane <--> WorkspacesPlane
 ```
 
 ### 4.2 Level 2: Deployment & Component Diagram
@@ -177,7 +177,7 @@ flowchart TD
     subgraph Phase1 ["Phase 1: Foundation (Account Plane)"]
         KMS["001.kms_key<br/>(KMS CMK)"]:::infra
         IAM["002.cross_account_role<br/>(IAM Role + MWS Creds)"]:::infra
-        NET["006.databricks_mws_networking<br/>(PrivateLink VPCEs + PAS)"]:::infra
+        NET["006.databricks_mws_networking<br/>(MWS Network Config)"]:::infra
         S3["002.databricks_root_bucket<br/>(S3 Root + MWS Storage)"]:::infra
         WS["001.generic_workspace<br/>(MWS Workspace + RBAC)"]:::infra
 
@@ -191,7 +191,7 @@ flowchart TD
         subgraph CompositeCompute ["004.workspace_compute (per Persona Workspace)"]
             POL["001.compute_policies<br/>(Admin <=25 DBU & Shared <=15 DBU)"]:::policy
             CLS["002.all_purpose_cluster<br/>(Autoscaling Cluster Engine)"]:::compute
-            SQL["003.sql_warehouse<br/>(Serverless / Pro SQL Warehouse)"]:::compute
+            SQL["003.sql_warehouse<br/>(PRO SQL Warehouse)"]:::compute
 
             POL -->|"Passes Policy ID"| CLS
         end
@@ -208,10 +208,10 @@ Every workspace automatically deploys the capped **Platform Admin** policy along
 
 | Policy / Workload | Scope / Target Workspace | Core Constraints & Rules | Allowed Instance Families | Group RBAC |
 |:---|:---|:---|:---|:---|
-| **Platform Admin Policy** | All Workspaces | **Max 25 DBUs/hr budget cap**, max 4 workers, max 45 min idle timeout | `m5.large`, `m5.xlarge`, `m5.2xlarge`, `c5.xlarge`, `c5.2xlarge`, `r5.xlarge`, `r5.2xlarge` | `CAN_USE` for `dbx-platform-admins` |
-| **Workspace Shared Policy** | All Workspaces | **Max 15 DBUs/hr budget cap**, auto-scaling 1–4 workers, max 30 min idle timeout | `m5.large`, `m5.xlarge`, `m5.2xlarge`, `i3.xlarge`, `r5.xlarge` | `CAN_USE` for `dbx-platform-admins` & workspace user groups |
-| **Data Engineering Compute** | `data_engineering` | ETL cluster (`de-etl-cluster-dev`, 1–3 workers, 30 min idle timeout) + SQL Warehouse (`de-sql-warehouse-dev`, `2X-Small`, 15 min auto-stop) | `m5.large` | `CAN_RESTART`/`CAN_USE` for `dbx-data-engineers` |
-| **Data Science Compute** | `data_science` | ML cluster (`ds-ml-cluster-dev`, 1–2 workers, ML runtime, 20 min idle timeout) | `m5.xlarge` | `CAN_RESTART` for `dbx-data-scientists` |
+| **Platform Admin Policy** | All Workspaces | **Max 25 DBUs/hr budget cap**, max 4 workers, max 45 min idle timeout, elastic disk enabled | `m5.xlarge`, `m5.2xlarge`, `m6i.xlarge`, `m6i.2xlarge`, `c5.xlarge`, `c5.2xlarge`, `c6i.xlarge`, `c6i.2xlarge`, `r5.xlarge`, `r5.2xlarge`, `r6i.xlarge`, `r6i.2xlarge`, `i3.xlarge`, `i3.2xlarge`, `i4i.xlarge`, `i4i.2xlarge` | `CAN_USE` for `dbx-platform-admins` |
+| **Workspace Shared Policy** | All Workspaces | **Max 15 DBUs/hr budget cap**, auto-scaling 1–4 workers, max 30 min idle timeout, elastic disk enabled | `m5.xlarge`, `m5.2xlarge`, `m6i.xlarge`, `m6i.2xlarge`, `c5.xlarge`, `c5.2xlarge`, `c6i.xlarge`, `c6i.2xlarge`, `r5.xlarge`, `r5.2xlarge`, `r6i.xlarge`, `r6i.2xlarge`, `i3.xlarge`, `i3.2xlarge`, `i4i.xlarge`, `i4i.2xlarge` | `CAN_USE` for `dbx-platform-admins` & workspace user groups |
+| **Data Engineering Compute** | `data_engineering` | ETL cluster (`de-etl-cluster-dev`, 1–3 workers, `18.x-scala2.13`, 30 min idle timeout) + SQL Warehouse (`de-sql-warehouse-dev`, `2X-Small`, 15 min auto-stop) | `m5.xlarge` | `CAN_RESTART`/`CAN_USE` for `dbx-data-engineers` |
+| **Data Science Compute** | `data_science` | ML cluster (`ds-ml-cluster-dev`, 1–2 workers, `18.x-cpu-ml-scala2.13`, 20 min idle timeout) | `m5.xlarge` | `CAN_RESTART` for `dbx-data-scientists` |
 | **Data Analytics Compute** | `data_analytics` | BI SQL Warehouse (`da-bi-warehouse-dev`, `X-Small`, 10 min auto-stop) | `X-Small` SQL Warehouse | `CAN_USE` for `dbx-data-analysts` |
 
 ---
@@ -226,7 +226,7 @@ Because workspace-scoped providers require live workspace URLs generated during 
 - Terraform `>= 1.5.0` and `uv` package manager installed.
 
 ### Stage 1: Foundation Deployment (Account Plane)
-Provisions the state backend, cross-account credentials, PrivateLink networking, root storage, and creates the Databricks workspaces:
+Provisions the state backend, cross-account credentials, customer-managed VPC network registration, root storage, and creates the Databricks workspaces:
 
 ```bash
 cd environments/dev

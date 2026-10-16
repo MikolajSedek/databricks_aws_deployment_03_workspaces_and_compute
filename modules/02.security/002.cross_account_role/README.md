@@ -93,12 +93,23 @@ flowchart TD
 
 ---
 
-## 5. Terraform Documentation Interface
+## 5. All Modules Used with Short Summaries
+
+This module does not invoke external submodules. It provisions native AWS IAM and Time resources directly and registers credentials in Databricks MWS using `databricks.mws`.
+
+- **Consumers**:
+  - [`001.generic_workspace`](file:///modules/04.workspaces/001.generic_workspace) - Consumes `credentials_id` to link cross-account IAM credentials to workspaces.
+  - [`002.databricks_root_bucket`](file:///modules/03.storage/002.databricks_root_bucket) - Consumes `role_arn` to establish KMS decryption grants for worker nodes.
+  - [`environments/dev`](file:///environments/dev) - Root environment orchestrator instantiating this cross-account role module.
+
+---
+
+## 6. Terraform Documentation Interface
 
 > [!NOTE]
 > Machine-generated interface specifications for this module are maintained by `terraform-docs` in [`TERRAFORM.md`](./TERRAFORM.md).
 
-### 5.1 Essential Inputs Summary
+### 6.1 Essential Inputs Summary
 
 | Variable | Type | Description | Required |
 |:---|:---:|:---|:---:|
@@ -107,7 +118,7 @@ flowchart TD
 | `credentials_name` | `string` | The name of the Databricks MWS credentials configuration | Yes |
 | `tags` | `map(string)` | Map of resource tags to attach to the IAM role | No |
 
-### 5.2 Essential Outputs Summary
+### 6.2 Essential Outputs Summary
 
 | Output | Type | Description |
 |:---|:---:|:---|
@@ -116,7 +127,7 @@ flowchart TD
 
 ---
 
-## 6. Important Links and References
+## 7. Important Links and References
 
 - [Databricks Cross-Account IAM Role Documentation](https://docs.databricks.com/aws/en/security/iam/credentials)
 - [Databricks MWS Credentials Resource Documentation](https://registry.terraform.io/providers/databricks/databricks/latest/docs/resources/mws_credentials)
