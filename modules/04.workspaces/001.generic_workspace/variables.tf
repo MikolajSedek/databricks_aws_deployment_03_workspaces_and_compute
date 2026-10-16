@@ -40,10 +40,7 @@ variable "storage_customer_managed_key_id" {
   type        = string
 }
 
-variable "private_access_settings_id" {
-  description = "The Databricks MWS Private Access Settings ID."
-  type        = string
-}
+
 
 variable "pricing_tier" {
   description = "The pricing tier of the workspace (e.g. PREMIUM, ENTERPRISE)."

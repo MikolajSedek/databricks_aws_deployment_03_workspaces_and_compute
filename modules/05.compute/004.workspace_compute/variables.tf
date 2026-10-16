@@ -28,6 +28,10 @@ variable "clusters" {
     spark_version           = string
     node_type_id            = string
     policy_id               = optional(string)
+    runtime_engine          = optional(string, "STANDARD")
+    data_security_mode      = optional(string, "USER_ISOLATION")
+    single_user_name        = optional(string)
+    enable_elastic_disk     = optional(bool, true)
     min_workers             = number
     max_workers             = number
     autotermination_minutes = optional(number, 30)

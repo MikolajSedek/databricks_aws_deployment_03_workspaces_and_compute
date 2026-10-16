@@ -71,7 +71,6 @@ resource "aws_s3_bucket_lifecycle_configuration" "root_bucket" {
 data "databricks_aws_bucket_policy" "this" {
   bucket                   = aws_s3_bucket.root_bucket.bucket
   databricks_e2_account_id = var.databricks_account_id
-  full_access_role         = var.cross_account_role_arn
 }
 
 resource "aws_s3_bucket_policy" "root_bucket" {

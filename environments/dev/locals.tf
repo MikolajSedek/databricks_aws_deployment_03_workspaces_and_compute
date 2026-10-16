@@ -17,7 +17,7 @@ locals {
   owner           = "msedek"
   env             = var.environment
   project_name    = "${local.owner}-dbx-dep"
-  subproject_name = "workspaces-compute-provider"
+  subproject_name = "workspaces-and-compute-provider"
 
   backend_bucket_name = "${local.project_name}-${local.subproject_name}-s3-backend"
 
@@ -32,8 +32,8 @@ locals {
   /* Declarative Multi-Workspace Configuration */
   workspaces = {
     data_engineering = {
-      workspace_name   = "${local.project_name}-de-${local.env}"
-      root_bucket_name = "${local.project_name}-de-root-${local.env}"
+      workspace_name   = "${local.project_name}-data-eng-${local.env}"
+      root_bucket_name = "${local.project_name}-data-eng-root-${local.env}"
       kms_key_alias    = "dbx_de_root_kms"
       kms_description  = "Customer-managed KMS key for Data Engineering workspace root storage"
       admin_group_name = local.admin_group_name
@@ -42,8 +42,11 @@ locals {
       clusters = {
         etl_shared = {
           cluster_name            = "de-etl-cluster-${local.env}"
-          spark_version           = "15.4.x-scala2.12"
-          node_type_id            = "m5.large"
+          spark_version           = "18.x-scala2.13"
+          node_type_id            = "m5.xlarge"
+          runtime_engine          = "STANDARD"
+          data_security_mode      = "USER_ISOLATION"
+          enable_elastic_disk     = true
           min_workers             = 1
           max_workers             = 3
           autotermination_minutes = 30
@@ -65,8 +68,8 @@ locals {
     }
 
     data_science = {
-      workspace_name   = "${local.project_name}-ds-${local.env}"
-      root_bucket_name = "${local.project_name}-ds-root-${local.env}"
+      workspace_name   = "${local.project_name}-data-science-${local.env}"
+      root_bucket_name = "${local.project_name}-data-science-root-${local.env}"
       kms_key_alias    = "dbx_ds_root_kms"
       kms_description  = "Customer-managed KMS key for Data Science workspace root storage"
       admin_group_name = local.admin_group_name
@@ -75,8 +78,11 @@ locals {
       clusters = {
         ml_exploration = {
           cluster_name            = "ds-ml-cluster-${local.env}"
-          spark_version           = "15.4.x-cpu-ml-scala2.12"
+          spark_version           = "18.x-cpu-ml-scala2.13"
           node_type_id            = "m5.xlarge"
+          runtime_engine          = "STANDARD"
+          data_security_mode      = "USER_ISOLATION"
+          enable_elastic_disk     = true
           min_workers             = 1
           max_workers             = 2
           autotermination_minutes = 20
@@ -91,8 +97,8 @@ locals {
     }
 
     data_analytics = {
-      workspace_name   = "${local.project_name}-da-${local.env}"
-      root_bucket_name = "${local.project_name}-da-root-${local.env}"
+      workspace_name   = "${local.project_name}-data-analytics-${local.env}"
+      root_bucket_name = "${local.project_name}-data-analytics-root-${local.env}"
       kms_key_alias    = "dbx_da_root_kms"
       kms_description  = "Customer-managed KMS key for Data Analytics workspace root storage"
       admin_group_name = local.admin_group_name

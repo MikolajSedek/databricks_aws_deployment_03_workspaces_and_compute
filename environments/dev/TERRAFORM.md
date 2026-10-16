@@ -53,11 +53,8 @@
 | <a name="input_databricks_account_id"></a> [databricks\_account\_id](#input\_databricks\_account\_id) | The Databricks account ID (UUID) used by the account-level provider. | `string` | n/a | yes |
 | <a name="input_environment"></a> [environment](#input\_environment) | Deployment environment name (e.g. dev, staging, prod). | `string` | `"dev"` | no |
 | <a name="input_profile"></a> [profile](#input\_profile) | AWS CLI user profile | `string` | `"default"` | no |
-| <a name="input_public_access_enabled"></a> [public\_access\_enabled](#input\_public\_access\_enabled) | Whether public internet access to the workspace web console is allowed (recommended true for dev). | `bool` | `true` | no |
-| <a name="input_relay_vpce_service_name"></a> [relay\_vpce\_service\_name](#input\_relay\_vpce\_service\_name) | The AWS VPC Endpoint service name for Databricks SCC Relay (eu-central-1). | `string` | `"com.amazonaws.vpce.eu-central-1.vpce-svc-08e5dfca9572c85c4"` | no |
 | <a name="input_service_principal_id"></a> [service\_principal\_id](#input\_service\_principal\_id) | The service principal ID for the Databricks workspace / account | `string` | n/a | yes |
 | <a name="input_service_principal_secret"></a> [service\_principal\_secret](#input\_service\_principal\_secret) | The service principal secret for the Databricks workspace / account | `string` | n/a | yes |
-| <a name="input_workspace_vpce_service_name"></a> [workspace\_vpce\_service\_name](#input\_workspace\_vpce\_service\_name) | The AWS VPC Endpoint service name for Databricks Workspace REST API (eu-central-1). | `string` | `"com.amazonaws.vpce.eu-central-1.vpce-svc-081f78503812597f7"` | no |
 
 ## Outputs
 

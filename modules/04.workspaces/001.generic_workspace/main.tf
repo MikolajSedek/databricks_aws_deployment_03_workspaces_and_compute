@@ -14,7 +14,6 @@ resource "databricks_mws_workspaces" "this" {
   storage_configuration_id        = var.storage_configuration_id
   network_id                      = var.network_id
   storage_customer_managed_key_id = var.storage_customer_managed_key_id
-  private_access_settings_id      = var.private_access_settings_id
   pricing_tier                    = var.pricing_tier
 }
 

@@ -33,7 +33,7 @@ variable "cross_account_role_arn" {
 variable "force_destroy" {
   description = "Whether to allow force destroy of all objects in the bucket when destroying."
   type        = bool
-  default     = false
+  default     = true
 }
 
 variable "tags" {

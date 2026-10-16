@@ -70,21 +70,3 @@ variable "databricks_account_id" {
     error_message = "The Databricks account ID must be a valid UUID."
   }
 }
-
-variable "workspace_vpce_service_name" {
-  description = "The AWS VPC Endpoint service name for Databricks Workspace REST API (eu-central-1)."
-  type        = string
-  default     = "com.amazonaws.vpce.eu-central-1.vpce-svc-081f78503812597f7"
-}
-
-variable "relay_vpce_service_name" {
-  description = "The AWS VPC Endpoint service name for Databricks SCC Relay (eu-central-1)."
-  type        = string
-  default     = "com.amazonaws.vpce.eu-central-1.vpce-svc-08e5dfca9572c85c4"
-}
-
-variable "public_access_enabled" {
-  description = "Whether public internet access to the workspace web console is allowed (recommended true for dev)."
-  type        = bool
-  default     = true
-}

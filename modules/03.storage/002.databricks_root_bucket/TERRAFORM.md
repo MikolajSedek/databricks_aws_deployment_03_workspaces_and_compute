@@ -101,7 +101,7 @@ No modules.
 | <a name="input_bucket_name"></a> [bucket\_name](#input\_bucket\_name) | The globally unique name of the S3 root storage bucket. | `string` | n/a | yes |
 | <a name="input_cross_account_role_arn"></a> [cross\_account\_role\_arn](#input\_cross\_account\_role\_arn) | The ARN of the Databricks cross-account IAM role authorized on the bucket. | `string` | n/a | yes |
 | <a name="input_databricks_account_id"></a> [databricks\_account\_id](#input\_databricks\_account\_id) | The Databricks Account ID used for MWS storage registration. | `string` | n/a | yes |
-| <a name="input_force_destroy"></a> [force\_destroy](#input\_force\_destroy) | Whether to allow force destroy of all objects in the bucket when destroying. | `bool` | `false` | no |
+| <a name="input_force_destroy"></a> [force\_destroy](#input\_force\_destroy) | Whether to allow force destroy of all objects in the bucket when destroying. | `bool` | `true` | no |
 | <a name="input_kms_key_arn"></a> [kms\_key\_arn](#input\_kms\_key\_arn) | The ARN of the AWS KMS key used to encrypt the S3 root bucket. | `string` | n/a | yes |
 | <a name="input_storage_configuration_name"></a> [storage\_configuration\_name](#input\_storage\_configuration\_name) | The name of the Databricks MWS storage configuration. | `string` | n/a | yes |
 | <a name="input_tags"></a> [tags](#input\_tags) | Map of resource tags to attach to the S3 bucket. | `map(string)` | `{}` | no |

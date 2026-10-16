@@ -92,7 +92,6 @@ No modules.
 | <a name="input_network_id"></a> [network\_id](#input\_network\_id) | The Databricks MWS network ID (customer-managed VPC). | `string` | n/a | yes |
 | <a name="input_persona_principal_id"></a> [persona\_principal\_id](#input\_persona\_principal\_id) | Deprecated principal ID of the persona group. | `string` | `null` | no |
 | <a name="input_pricing_tier"></a> [pricing\_tier](#input\_pricing\_tier) | The pricing tier of the workspace (e.g. PREMIUM, ENTERPRISE). | `string` | `"ENTERPRISE"` | no |
-| <a name="input_private_access_settings_id"></a> [private\_access\_settings\_id](#input\_private\_access\_settings\_id) | The Databricks MWS Private Access Settings ID. | `string` | n/a | yes |
 | <a name="input_storage_configuration_id"></a> [storage\_configuration\_id](#input\_storage\_configuration\_id) | The Databricks MWS storage configuration ID (root S3 bucket). | `string` | n/a | yes |
 | <a name="input_storage_customer_managed_key_id"></a> [storage\_customer\_managed\_key\_id](#input\_storage\_customer\_managed\_key\_id) | The Databricks MWS customer-managed key ID for storage encryption. | `string` | n/a | yes |
 | <a name="input_user_group_names"></a> [user\_group\_names](#input\_user\_group\_names) | List of user group names (e.g. ['dbx-data-engineers']) granted USER role on the workspace. | `list(string)` | `[]` | no |

@@ -26,6 +26,10 @@ module "clusters" {
   spark_version           = each.value.spark_version
   node_type_id            = each.value.node_type_id
   policy_id               = coalesce(each.value.policy_id, module.compute_policies.shared_policy_id)
+  runtime_engine          = coalesce(each.value.runtime_engine, "STANDARD")
+  data_security_mode      = coalesce(each.value.data_security_mode, "USER_ISOLATION")
+  single_user_name        = each.value.single_user_name
+  enable_elastic_disk     = coalesce(each.value.enable_elastic_disk, true)
   min_workers             = each.value.min_workers
   max_workers             = each.value.max_workers
   autotermination_minutes = each.value.autotermination_minutes

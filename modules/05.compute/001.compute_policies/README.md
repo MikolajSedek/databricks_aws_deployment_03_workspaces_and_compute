@@ -10,10 +10,11 @@
 - **Purpose & Scope**:
   This module provisions role-based Databricks Cluster Policies (`databricks_cluster_policy`) and binds granular access permissions (`databricks_permissions`) granting `CAN_USE` to authorized groups. It enforces strict architectural and financial constraints across all compute workloads, featuring a hard **25 DBU/hour budget cap** on platform administrator compute, alongside a governed **Shared Workspace Policy** capped at **15 DBU/hour** for workspace users.
 - **Problem Statement & Solution**:
-  Without cluster policies, users can launch oversized instances (such as GPU nodes for basic queries), omit auto-termination timeouts, or exceed enterprise infrastructure budgets. This module prevents compute sprawl by enforcing JSON policy definitions that restrict allowable instance types, enforce mandatory autotermination, cap worker autoscaling limits, restrict runtime engines, constrain Databricks runtime versions to latest releases, and restrict cluster creation permissions.
+  Without cluster policies, users can launch oversized instances (such as GPU nodes for basic queries), omit auto-termination timeouts, run out of disk space during heavy shuffles, or exceed enterprise infrastructure budgets. This module prevents compute sprawl and job failures by enforcing JSON policy definitions that restrict allowable instance types, mandate autoscaling local storage (`enable_elastic_disk = true`), enforce mandatory autotermination, cap worker autoscaling limits, restrict runtime engines, constrain Databricks runtime versions to latest releases, and restrict cluster creation permissions.
 - **Key Business & Security Outcomes**:
   - **Financial Guardrails**: A hard limit of 25 DBUs/hour on Platform Admin clusters and 15 DBUs/hour on Shared Workspace clusters prevents accidental high-cost compute operations.
-  - **Engine & Architecture Optimization**: Platform Admins are permitted to use the vectorized Photon runtime engine, paired with Photon-capable node families.
+  - **Engine & Architecture Optimization**: Platform Admins and shared users are permitted to use the vectorized Photon runtime engine, strictly paired with Photon-compatible EC2 node families (`.xlarge` and `.2xlarge` tiers in `m5`, `m6i`, `c5`, `c6i`, `r5`, `r6i`, `i3`, `i4i`). Sub-xlarge instances (`.large`) are removed from Photon-capable policies to avoid runtime failures.
+  - **Autoscaling Storage (Elastic Disk)**: Enforces `enable_elastic_disk = true` across policies to dynamically attach additional EBS volumes during large shuffle or data spill operations.
   - **Runtime Version Governance**: Only the latest and previous GA and LTS Databricks Runtime releases (`auto:latest`, `auto:prev-major`, `auto:latest-lts`, `auto:prev-lts`) are permitted.
   - **Role-Based Access Control**: Binds `CAN_USE` permissions to specific user groups and administrators, ensuring users only launch approved cluster configurations.
 
@@ -23,14 +24,14 @@
 
 ### 2.1 Governance Matrix & Constraints
 
-| Policy Name | Target Group | Node Type Allowlist | Worker Limits | Max Inactivity Timeout | Photon Support | Runtime Restrictions | DBU / Budget Constraints |
-|:---|:---|:---|:---:|:---:|:---:|:---|:---|
-| **Platform Admin** | `admin_group_name` | `m5.large`, `m5.xlarge`, `m5.2xlarge`, `c5.xlarge`, `c5.2xlarge`, `r5.xlarge`, `r5.2xlarge` | Max 4 workers | 45 minutes | Allowed (`PHOTON` / `STANDARD`) | `auto:latest-lts`, `auto:prev-lts`, `auto:latest`, `auto:prev-major` | **Max 25 DBUs/hr** (`dbus_per_hour` range cap) |
-| **Shared Workspace** | `user_group_names` | `m5.large`, `m5.xlarge`, `m5.2xlarge`, `i3.xlarge`, `r5.xlarge` | Autoscale 1–4 workers | 30 minutes | Allowed (`PHOTON` / `STANDARD`) | `auto:latest-lts`, `auto:prev-lts`, `auto:latest-lts-ml`, `auto:prev-lts-ml` | **Max 15 DBUs/hr** (`dbus_per_hour` range cap) |
+| Policy Name | Target Group | Node Type Allowlist | Worker Limits | Max Inactivity Timeout | Photon Support | Autoscaling Storage | DBU / Budget Constraints |
+|:---|:---|:---|:---:|:---:|:---:|:---:|:---|
+| **Platform Admin** | `admin_group_name` | `m5.xlarge`, `m5.2xlarge`, `m6i.xlarge`, `m6i.2xlarge`, `c5.xlarge`, `c5.2xlarge`, `c6i.xlarge`, `c6i.2xlarge`, `r5.xlarge`, `r5.2xlarge`, `r6i.xlarge`, `r6i.2xlarge`, `i3.xlarge`, `i3.2xlarge`, `i4i.xlarge`, `i4i.2xlarge` | Max 4 workers | 45 minutes | Allowed (`PHOTON` / `STANDARD`) | Enforced (`enable_elastic_disk = true`) | **Max 25 DBUs/hr** (`dbus_per_hour` range cap) |
+| **Shared Workspace** | `user_group_names` | `m5.xlarge`, `m5.2xlarge`, `m6i.xlarge`, `m6i.2xlarge`, `c5.xlarge`, `c5.2xlarge`, `c6i.xlarge`, `c6i.2xlarge`, `r5.xlarge`, `r5.2xlarge`, `r6i.xlarge`, `r6i.2xlarge`, `i3.xlarge`, `i3.2xlarge`, `i4i.xlarge`, `i4i.2xlarge` | Autoscale 1–4 workers | 30 minutes | Allowed (`PHOTON` / `STANDARD`) | Enforced (`enable_elastic_disk = true`) | **Max 15 DBUs/hr** (`dbus_per_hour` range cap) |
 
 ### 2.2 Provisioning Lifecycle
-1. **Admin Policy Creation**: Provisions `databricks_cluster_policy.admin_policy` with the 25 DBU cap, Photon support, and assigns `CAN_USE` to `var.admin_group_name`.
-2. **Shared Workspace Policy**: Provisions `databricks_cluster_policy.shared_policy` with the 15 DBU cap and assigns `CAN_USE` to `var.admin_group_name` and `var.user_group_names`.
+1. **Admin Policy Creation**: Provisions `databricks_cluster_policy.admin_policy` with the 25 DBU cap, Photon support, elastic disk enforcement, and assigns `CAN_USE` to `var.admin_group_name`.
+2. **Shared Workspace Policy**: Provisions `databricks_cluster_policy.shared_policy` with the 15 DBU cap, Photon support, elastic disk enforcement, and assigns `CAN_USE` to `var.admin_group_name` and `var.user_group_names`.
 3. **Policy ID Export**: Exposes `shared_policy_id` for downstream cluster binding.
 
 ---
@@ -41,9 +42,9 @@
 
 | Resource Identifier | Resource Type | Description |
 |:---|:---|:---|
-| `databricks_cluster_policy.admin_policy` | `databricks_cluster_policy` | Capped policy enforcing max 25 DBUs/hr budget cap and Photon support |
+| `databricks_cluster_policy.admin_policy` | `databricks_cluster_policy` | Capped policy enforcing max 25 DBUs/hr budget cap, Photon support, and elastic disk |
 | `databricks_permissions.admin_policy` | `databricks_permissions` | Grants `CAN_USE` to the platform admin group |
-| `databricks_cluster_policy.shared_policy` | `databricks_cluster_policy` | Workspace shared policy enforcing max 15 DBUs/hr budget cap |
+| `databricks_cluster_policy.shared_policy` | `databricks_cluster_policy` | Workspace shared policy enforcing max 15 DBUs/hr budget cap and elastic disk |
 | `databricks_permissions.shared_policy` | `databricks_permissions` | Grants `CAN_USE` to admins and user groups |
 
 ---
@@ -62,8 +63,8 @@ flowchart TD
     Inputs["Inputs: admin_group_name, user_group_names"]:::input
 
     subgraph Policies ["Cluster Policies"]
-        AdminPol["Admin Policy (Max 25 DBU, Photon)"]:::policy
-        SharedPol["Shared Policy (Max 15 DBU, Autoscale 1-4)"]:::policy
+        AdminPol["Admin Policy (Max 25 DBU, Photon, Elastic Disk)"]:::policy
+        SharedPol["Shared Policy (Max 15 DBU, Autoscale 1-4, Elastic Disk)"]:::policy
     end
 
     subgraph ACLs ["Policy Access Permissions (CAN_USE)"]

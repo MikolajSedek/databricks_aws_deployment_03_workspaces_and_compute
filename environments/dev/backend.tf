@@ -11,7 +11,7 @@
 
 terraform {
   backend "s3" {
-    bucket       = "msedek-dbx-dep-workspaces-compute-provider-s3-backend-dev"
+    bucket       = "msedek-dbx-dep-workspaces-and-compute-provider-s3-backend-dev"
     key          = "03_workspaces_and_compute_management/dev/terraform.tfstate"
     region       = "eu-central-1"
     encrypt      = true

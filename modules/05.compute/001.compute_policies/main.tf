@@ -25,16 +25,35 @@ resource "databricks_cluster_policy" "admin_policy" {
       "values"       = ["PHOTON", "STANDARD"]
       "defaultValue" = "PHOTON"
     }
+    "data_security_mode" = {
+      "type"         = "allowlist"
+      "values"       = ["USER_ISOLATION", "SINGLE_USER"]
+      "defaultValue" = "USER_ISOLATION"
+    }
+    "enable_elastic_disk" = {
+      "type"         = "fixed"
+      "value"        = true
+      "defaultValue" = true
+    }
     "node_type_id" = {
       "type" = "allowlist"
       "values" = [
-        "m5.large",
         "m5.xlarge",
         "m5.2xlarge",
+        "m6i.xlarge",
+        "m6i.2xlarge",
         "c5.xlarge",
         "c5.2xlarge",
+        "c6i.xlarge",
+        "c6i.2xlarge",
         "r5.xlarge",
-        "r5.2xlarge"
+        "r5.2xlarge",
+        "r6i.xlarge",
+        "r6i.2xlarge",
+        "i3.xlarge",
+        "i3.2xlarge",
+        "i4i.xlarge",
+        "i4i.2xlarge"
       ]
       "defaultValue" = "m5.xlarge"
     }
@@ -93,16 +112,37 @@ resource "databricks_cluster_policy" "shared_policy" {
       "values"       = ["PHOTON", "STANDARD"]
       "defaultValue" = "PHOTON"
     }
+    "data_security_mode" = {
+      "type"         = "allowlist"
+      "values"       = ["USER_ISOLATION", "SINGLE_USER"]
+      "defaultValue" = "USER_ISOLATION"
+    }
+    "enable_elastic_disk" = {
+      "type"         = "fixed"
+      "value"        = true
+      "defaultValue" = true
+    }
     "node_type_id" = {
       "type" = "allowlist"
       "values" = [
-        "m5.large",
         "m5.xlarge",
         "m5.2xlarge",
+        "m6i.xlarge",
+        "m6i.2xlarge",
+        "c5.xlarge",
+        "c5.2xlarge",
+        "c6i.xlarge",
+        "c6i.2xlarge",
+        "r5.xlarge",
+        "r5.2xlarge",
+        "r6i.xlarge",
+        "r6i.2xlarge",
         "i3.xlarge",
-        "r5.xlarge"
+        "i3.2xlarge",
+        "i4i.xlarge",
+        "i4i.2xlarge"
       ]
-      "defaultValue" = "m5.large"
+      "defaultValue" = "m5.xlarge"
     }
     "spark_version" = {
       "type" = "allowlist"

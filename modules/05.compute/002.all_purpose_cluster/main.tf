@@ -10,6 +10,10 @@ resource "databricks_cluster" "this" {
   spark_version           = var.spark_version
   node_type_id            = var.node_type_id
   policy_id               = var.policy_id
+  runtime_engine          = var.runtime_engine
+  data_security_mode      = var.data_security_mode
+  single_user_name        = var.data_security_mode == "SINGLE_USER" ? var.single_user_name : null
+  enable_elastic_disk     = var.enable_elastic_disk
   autotermination_minutes = var.autotermination_minutes
 
   autoscale {

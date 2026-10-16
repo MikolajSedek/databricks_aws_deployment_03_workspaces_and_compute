@@ -55,15 +55,11 @@ module "mws_networking" {
     databricks.mws = databricks.mws
   }
 
-  databricks_account_id       = var.databricks_account_id
-  network_name                = local.network_name
-  vpc_id                      = data.aws_vpc.spoke.id
-  subnet_ids                  = data.aws_subnets.spoke_compute.ids
-  security_group_ids          = [data.aws_security_group.spoke_sg.id]
-  aws_region                  = var.aws_region
-  workspace_vpce_service_name = var.workspace_vpce_service_name
-  relay_vpce_service_name     = var.relay_vpce_service_name
-  public_access_enabled       = var.public_access_enabled
+  databricks_account_id = var.databricks_account_id
+  network_name          = local.network_name
+  vpc_id                = data.aws_vpc.spoke.id
+  subnet_ids            = data.aws_subnets.spoke_compute.ids
+  security_group_ids    = [data.aws_security_group.spoke_sg.id]
 }
 
 /* 4. Dedicated Customer-Managed KMS Keys per Workspace */
@@ -114,7 +110,6 @@ module "workspaces" {
   storage_configuration_id        = module.root_buckets[each.key].storage_configuration_id
   network_id                      = module.mws_networking.network_id
   storage_customer_managed_key_id = module.root_buckets[each.key].customer_managed_key_id
-  private_access_settings_id      = module.mws_networking.private_access_settings_id
   admin_group_name                = each.value.admin_group_name
   user_group_names                = each.value.user_group_names
 }
