@@ -3,6 +3,7 @@
   Documentation:
     - https://registry.terraform.io/providers/databricks/databricks/latest/docs/resources/mws_workspaces
     - https://registry.terraform.io/providers/databricks/databricks/latest/docs/resources/mws_permission_assignment
+    - https://registry.terraform.io/providers/databricks/databricks/latest/docs/guides/aws-private-link-workspace
 */
 
 variable "account_id" {
@@ -40,7 +41,11 @@ variable "storage_customer_managed_key_id" {
   type        = string
 }
 
-
+variable "private_access_settings_id" {
+  description = "The Databricks MWS Private Access Settings (PAS) ID for PrivateLink connectivity."
+  type        = string
+  default     = null
+}
 
 variable "pricing_tier" {
   description = "The pricing tier of the workspace (e.g. PREMIUM, ENTERPRISE)."

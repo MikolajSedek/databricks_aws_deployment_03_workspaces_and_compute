@@ -39,6 +39,10 @@ Always ground implementations in official, up-to-date documentation. Do not rely
   - [Databricks AWS E2 Firewall Hub and Spoke Guide](https://github.com/databricks/terraform-provider-databricks/blob/main/docs/guides/aws-e2-firewall-hub-and-spoke.md)
 - **Databricks Customer-Managed VPC**:
   - [Databricks Customer-Managed VPC Configuration Guide](https://docs.databricks.com/aws/en/administration-guide/cloud-configurations/aws/customer-managed-vpc)
+- **Databricks AWS PrivateLink Workspace Terraform Guide**:
+  - [Databricks AWS PrivateLink Workspace Guide](https://registry.terraform.io/providers/databricks/databricks/latest/docs/guides/aws-private-link-workspace) *(Imperative source of truth for provisioning Databricks and AWS resources needed for private connectivity between the data plane and control plane, including VPC endpoint registration (`databricks_mws_vpc_endpoint`), private access settings (`databricks_mws_private_access_settings`), customer-managed network VPC endpoint associations (`databricks_mws_networks`), and private workspace provisioning)*
+- **Databricks Classic PrivateLink & Control Plane Connectivity Guide**:
+  - [Databricks Classic Private Connectivity Documentation](https://docs.databricks.com/aws/en/security/network/classic/privatelink) *(Imperative source of truth for configuring AWS PrivateLink for classic compute plane back-end private connectivity to Databricks control plane services, covering workspace REST API and secure cluster connectivity relay VPC endpoint requirements, private access settings, DNS configuration, and security isolation)*
 
 ### B. AWS Official Documentation
 - **AWS Documentation MCP Server (`aws-docs`)**:
@@ -81,6 +85,10 @@ When assisting with infrastructure tasks:
    - Query the **AWS Documentation MCP Server (`aws-docs`)** to verify security best practices (e.g., KMS key policies, bucket policies, VPC endpoint routing, IAM cross-account roles).
 6. **Check for Deprecations**:
    - Verify that new resource blocks follow modern AWS provider syntax (e.g., standalone `aws_s3_bucket_*`, `aws_route_table`, `aws_networkfirewall_*` resources).
+7. **Adhere to Control Plane Private Connectivity Standards (AWS PrivateLink)**:
+   - When configuring private connectivity between the customer data plane and the Databricks control plane, strictly consult the [Databricks AWS PrivateLink Workspace Guide](https://registry.terraform.io/providers/databricks/databricks/latest/docs/guides/aws-private-link-workspace) and [Databricks Classic Private Connectivity Documentation](https://docs.databricks.com/aws/en/security/network/classic/privatelink).
+   - Ensure the required AWS interface VPC endpoints (workspace API `com.amazonaws.vpce.<region>.k8s-workspace` and SCC relay `com.amazonaws.vpce.<region>.k8s-tunnel`) are created with dedicated endpoint subnets and security groups.
+   - Register VPC endpoints in the Databricks account using `databricks_mws_vpc_endpoint`, configure `databricks_mws_private_access_settings`, attach endpoint IDs to `databricks_mws_networks` (`vpc_endpoints.rest_api` and `vpc_endpoints.dataplane_relay`), and attach `private_access_settings_id` to `databricks_mws_workspaces`.
 
 ---
 
@@ -186,9 +194,10 @@ Mermaid CLI (`@mermaid-js/mermaid-cli`) parses markdown files, extracts fenced `
     'environments/dev/README.md',
     'modules/01.networking/001.generic_vpc/README.md',
     'modules/01.networking/002.spoke_vpc/README.md',
-    'modules/01.networking/003.hub_vpc/README.md',
-    'modules/01.networking/004.transit_gateway_spoke_hub/README.md',
-    'modules/01.networking/005.hub_networking_firewall/README.md',
+    'modules/01.networking/003.spoke_privatelink/README.md',
+    'modules/01.networking/004.hub_vpc/README.md',
+    'modules/01.networking/005.transit_gateway_spoke_hub/README.md',
+    'modules/01.networking/006.hub_networking_firewall/README.md',
     'modules/02.security/001.kms_key/README.md',
     'modules/03.storage/001.env_backend_bucket/README.md'
   ];
@@ -242,12 +251,105 @@ Mermaid CLI (`@mermaid-js/mermaid-cli`) parses markdown files, extracts fenced `
 2. **Node Label Quoting**:
    - Always enclose node labels in explicit double quotes: `nodeId["Service Name (VPC / Subnet)"]`.
    - Never leave unquoted parentheses, colons, brackets, or slashes inside labels.
-3. **Prohibition of Raw HTML**:
-   - Avoid raw HTML tags such as `<br/>`, `<b>`, or `<span>` inside node labels; use multiple spaced lines or distinct sub-nodes instead.
+3. **HTML Tags in Node Labels**:
+   - Restrict HTML in node labels strictly to architectural icon embeddings (`<img .../>`), line breaks (`<br/>`), and bold titles (`<b>...</b>`).
+   - All HTML tag attributes MUST use single quotes (`'...'`) inside the outer double-quoted node label string `["..."]`.
 4. **Valid Connector Syntax**:
   - Standard solid arrow: `A --> B`
   - Labeled solid arrow: `A -->|"Encrypted TLS (443)"| B`
   - Labeled dotted reference: `A -.->|"KMS Key ARN"| B`
+
+#### 4. Official AWS and Databricks Architecture Icons & Sizing Protocol
+
+To achieve publication-grade, professional C4 diagrams in markdown, embed official AWS and Databricks architecture icons directly inside Mermaid node labels.
+
+##### a. Authoritative CDN Icon Sources
+Use the verified CDN asset paths from the [`mingrammer/diagrams`](https://github.com/mingrammer/diagrams) open-source architecture icon repository and the [`oieduardorabelo/databricks-architecture-icons`](https://github.com/oieduardorabelo/databricks-architecture-icons) library (built from official Databricks SVG artwork; see [web catalog](https://oieduardorabelo.github.io/databricks-architecture-icons/) for all 71 products across `svg/`, `svg-mono/`, `svg-tile/`, `svg-outline/`, `png/`, `png-tile/`, and `png-outline/` variants):
+- **Databricks General & Platform**:
+  - Databricks Brand Logo (`mingrammer`): `https://raw.githubusercontent.com/mingrammer/diagrams/master/resources/onprem/analytics/databricks.png`
+  - Databricks Platform Mark: `https://raw.githubusercontent.com/oieduardorabelo/databricks-architecture-icons/main/icons/png/databricks.png`
+  - Data Intelligence Platform: `https://raw.githubusercontent.com/oieduardorabelo/databricks-architecture-icons/main/icons/png/data-intelligence-platform.png`
+  - Lakehouse Architecture: `https://raw.githubusercontent.com/oieduardorabelo/databricks-architecture-icons/main/icons/png/lakehouse.png`
+- **Databricks Workspaces, Compute & Runtime**:
+  - Databricks Workspace: `https://raw.githubusercontent.com/oieduardorabelo/databricks-architecture-icons/main/icons/png/workspace.png`
+  - Compute Clusters (All-Purpose / Job): `https://raw.githubusercontent.com/oieduardorabelo/databricks-architecture-icons/main/icons/png/compute-clusters.png`
+  - Serverless Compute: `https://raw.githubusercontent.com/oieduardorabelo/databricks-architecture-icons/main/icons/png/serverless-compute.png`
+  - Databricks Runtime (DBR / ML): `https://raw.githubusercontent.com/oieduardorabelo/databricks-architecture-icons/main/icons/png/databricks-runtime.png`
+  - Apache Spark: `https://raw.githubusercontent.com/oieduardorabelo/databricks-architecture-icons/main/icons/png/apache-spark.png`
+  - Photon Engine: `https://raw.githubusercontent.com/oieduardorabelo/databricks-architecture-icons/main/icons/png/photon.png`
+- **Databricks Governance, Security & Storage**:
+  - Unity Catalog: `https://raw.githubusercontent.com/oieduardorabelo/databricks-architecture-icons/main/icons/png/unity-catalog.png`
+  - Enterprise Security (PrivateLink / CMK / Network Isolation): `https://raw.githubusercontent.com/oieduardorabelo/databricks-architecture-icons/main/icons/png/enterprise-security.png`
+  - Attribute-Based Access Control (ABAC): `https://raw.githubusercontent.com/oieduardorabelo/databricks-architecture-icons/main/icons/png/abac.png`
+  - Data Lineage: `https://raw.githubusercontent.com/oieduardorabelo/databricks-architecture-icons/main/icons/png/data-lineage.png`
+  - System Tables: `https://raw.githubusercontent.com/oieduardorabelo/databricks-architecture-icons/main/icons/png/system-tables.png`
+  - Delta Lake: `https://raw.githubusercontent.com/oieduardorabelo/databricks-architecture-icons/main/icons/png/delta-lake.png`
+  - Lakehouse Storage (Managed Delta / Iceberg Tables): `https://raw.githubusercontent.com/oieduardorabelo/databricks-architecture-icons/main/icons/png/lakehouse-storage.png`
+  - Delta Sharing: `https://raw.githubusercontent.com/oieduardorabelo/databricks-architecture-icons/main/icons/png/delta-sharing.png`
+- **Databricks SQL, Data Engineering & AI**:
+  - SQL Warehouse: `https://raw.githubusercontent.com/oieduardorabelo/databricks-architecture-icons/main/icons/png/sql-warehouse.png`
+  - Databricks SQL: `https://raw.githubusercontent.com/oieduardorabelo/databricks-architecture-icons/main/icons/png/databricks-sql.png`
+  - AI/BI Dashboards: `https://raw.githubusercontent.com/oieduardorabelo/databricks-architecture-icons/main/icons/png/ai-bi-dashboards.png`
+  - Lakeflow (Data Engineering Suite): `https://raw.githubusercontent.com/oieduardorabelo/databricks-architecture-icons/main/icons/png/lakeflow.png`
+  - Lakeflow Jobs (Workflows): `https://raw.githubusercontent.com/oieduardorabelo/databricks-architecture-icons/main/icons/png/lakeflow-jobs.png`
+  - Lakeflow Declarative Pipelines (Delta Live Tables): `https://raw.githubusercontent.com/oieduardorabelo/databricks-architecture-icons/main/icons/png/spark-declarative-pipelines.png`
+  - Auto Loader: `https://raw.githubusercontent.com/oieduardorabelo/databricks-architecture-icons/main/icons/png/auto-loader.png`
+  - MLflow: `https://raw.githubusercontent.com/oieduardorabelo/databricks-architecture-icons/main/icons/png/mlflow.png`
+  - Model Serving: `https://raw.githubusercontent.com/oieduardorabelo/databricks-architecture-icons/main/icons/png/model-serving.png`
+- **Databricks DevTools & Automation**:
+  - Databricks Terraform Provider: `https://raw.githubusercontent.com/oieduardorabelo/databricks-architecture-icons/main/icons/png/terraform-provider.png`
+  - Databricks Asset Bundles: `https://raw.githubusercontent.com/oieduardorabelo/databricks-architecture-icons/main/icons/png/asset-bundles.png`
+  - Collaborative Notebooks: `https://raw.githubusercontent.com/oieduardorabelo/databricks-architecture-icons/main/icons/png/notebooks.png`
+  - Git Folders (Repos): `https://raw.githubusercontent.com/oieduardorabelo/databricks-architecture-icons/main/icons/png/git-folders.png`
+  - Databricks CLI: `https://raw.githubusercontent.com/oieduardorabelo/databricks-architecture-icons/main/icons/png/databricks-cli.png`
+  - REST API: `https://raw.githubusercontent.com/oieduardorabelo/databricks-architecture-icons/main/icons/png/rest-api.png`
+- **AWS General & Identity**:
+  - Users / Data Engineers: `https://raw.githubusercontent.com/mingrammer/diagrams/master/resources/aws/general/users.png`
+  - Cloud / General AWS Service: `https://raw.githubusercontent.com/mingrammer/diagrams/master/resources/aws/general/general.png`
+  - Public Internet / External SaaS: `https://raw.githubusercontent.com/mingrammer/diagrams/master/resources/aws/general/internet-alt1.png`
+- **AWS Networking**:
+  - Virtual Private Cloud (VPC): `https://raw.githubusercontent.com/mingrammer/diagrams/master/resources/aws/network/vpc.png`
+  - Transit Gateway (TGW): `https://raw.githubusercontent.com/mingrammer/diagrams/master/resources/aws/network/transit-gateway.png`
+  - Internet Gateway (IGW): `https://raw.githubusercontent.com/mingrammer/diagrams/master/resources/aws/network/internet-gateway.png`
+  - NAT Gateway: `https://raw.githubusercontent.com/mingrammer/diagrams/master/resources/aws/network/nat-gateway.png`
+  - PrivateLink: `https://raw.githubusercontent.com/mingrammer/diagrams/master/resources/aws/network/privatelink.png`
+  - VPC Endpoints (Interface / Gateway): `https://raw.githubusercontent.com/mingrammer/diagrams/master/resources/aws/network/endpoint.png`
+- **AWS Security & Storage**:
+  - Identity and Access Management (IAM): `https://raw.githubusercontent.com/mingrammer/diagrams/master/resources/aws/security/identity-and-access-management-iam.png`
+  - Simple Storage Service (S3): `https://raw.githubusercontent.com/mingrammer/diagrams/master/resources/aws/storage/simple-storage-service-s3.png`
+  - Key Management Service (KMS): `https://raw.githubusercontent.com/mingrammer/diagrams/master/resources/aws/security/key-management-service.png`
+  - AWS Network Firewall / Shield: `https://raw.githubusercontent.com/mingrammer/diagrams/master/resources/aws/security/shield.png`
+- **AWS Compute**:
+  - EC2 / Spark Worker Instances: `https://raw.githubusercontent.com/mingrammer/diagrams/master/resources/aws/compute/ec2.png`
+
+##### b. Mandatory Resizing, Aspect Ratio & Anti-Flattening Rules
+> [!IMPORTANT]
+> **Anti-Flattening Protection**: Markdown engines (PyCharm, IntelliJ JCEF, GitHub, GitLab, and browser previewers) apply global CSS resets (e.g., `img { width: 100%; max-width: 100%; }`). Inside Mermaid SVG `<foreignObject>`, this reset forces square icons to stretch horizontally to 100% of the node width while remaining clamped vertically, causing icons to look squashed or flattened like a pancake.
+
+To guarantee perfect 1:1 square proportions and avoid diagram bloat, **strictly adhere to the following rules**:
+1. **Declare Both HTML Dimensions AND Inline CSS**:
+   Always declare `width`, `height`, AND an explicit inline `style` with `max-width` and `max-height`.
+2. **Mandatory Tag Template**:
+   ```html
+   <img src='<ICON_URL>' width='<SIZE>' height='<SIZE>' style='width:<SIZE>px;height:<SIZE>px;max-width:<SIZE>px;max-height:<SIZE>px;display:block;margin:0 auto;object-fit:contain;' /><br/><b><TITLE></b><br/>(<SUBTITLE>)
+   ```
+3. **CSS Property Requirements**:
+   - `display: block; margin: 0 auto;`: Centers the icon squarely above node text and eliminates inline baseline alignment collapse.
+   - `object-fit: contain;`: Enforces strict preservation of the source 1:1 aspect ratio.
+   - `max-width:<SIZE>px; max-height:<SIZE>px;`: Overrides global previewer `width: 100%` resets to eliminate horizontal stretching.
+4. **Standard Size Hierarchy**:
+   - **Primary Architecture Tier (`36px`)**: Level 1 systems/actors (Data Engineers, Databricks Control Plane, AWS Stack) and Level 2 core backbones (Transit Gateway, Databricks Clusters).
+     ```html
+     <img src='...' width='36' height='36' style='width:36px;height:36px;max-width:36px;max-height:36px;display:block;margin:0 auto;object-fit:contain;' />
+     ```
+   - **Secondary Network & Security Tier (`32px`)**: Gateways and perimeter services (IGW, NAT, Network Firewall, PrivateLink, S3 Endpoint).
+     ```html
+     <img src='...' width='32' height='32' style='width:32px;height:32px;max-width:32px;max-height:32px;display:block;margin:0 auto;object-fit:contain;' />
+     ```
+   - **Component & Module Inventory Tier (`28px`)**: Subnets in Level 2 and Terraform module inventory boxes in Level 3.
+     ```html
+     <img src='...' width='28' height='28' style='width:28px;height:28px;max-width:28px;max-height:28px;display:block;margin:0 auto;object-fit:contain;' />
+     ```
 
 ---
 
@@ -260,6 +362,7 @@ Mermaid CLI (`@mermaid-js/mermaid-cli`) parses markdown files, extracts fenced `
 - **Networking Integrity**:
   - Maintain strict separation of concerns between Hub VPC (Transit Gateway, Network Firewall, NAT Gateways, Internet Gateway) and Spoke VPCs (Databricks Workspace compute and storage subnets).
   - Ensure all Databricks control plane and storage traffic routes through the firewall or VPC endpoints as dictated by the architecture guide.
+  - For back-end private connectivity to the Databricks control plane, strictly provision the required AWS PrivateLink interface VPC endpoints and register them with Databricks Account MWS resources according to the authoritative guides.
 - **State Management**:
   - Terraform remote state is stored in versioned, KMS-encrypted S3 buckets with DynamoDB state locking (`LockID` attribute).
 - **CI/CD & GitHub Actions Deployments**:
@@ -329,7 +432,14 @@ When creating any new module or root environment, strictly follow this standard 
 - **Databricks Provider Scopes (Account-Level vs. Workspace-Level)**:
   - Be explicitly aware that Databricks resources require different provider scopes:
     - **Workspace-Level Provider** (`host = https://<workspace-instance>.cloud.databricks.com/`): Used for clusters, jobs, notebooks, repos, workspace-level permissions, and workspace directory objects.
-    - **Account-Level Provider** (`host = "https://accounts.cloud.databricks.com"`, `account_id = var.databricks_account_id`): Required for account-level provisioning including MWS networks (`databricks_mws_networks`), storage configurations (`databricks_mws_storage_configurations`), credentials (`databricks_mws_credentials`), workspaces (`databricks_mws_workspaces`), and account metastore assignments.
+    - **Account-Level Provider** (`host = "https://accounts.cloud.databricks.com"`, `account_id = var.databricks_account_id`): Required for account-level provisioning including MWS networks (`databricks_mws_networks`), storage configurations (`databricks_mws_storage_configurations`), credentials (`databricks_mws_credentials`), workspaces (`databricks_mws_workspaces`), account metastore assignments, and **Control Plane Private Connectivity resources**:
+      - `databricks_mws_vpc_endpoint`: Registers AWS PrivateLink interface VPC endpoints (workspace REST API and secure cluster connectivity relay) with Databricks Account MWS.
+      - `databricks_mws_private_access_settings`: Defines Private Access Settings (PAS) governing public access flags, allowed VPC endpoint IDs, and private access levels (`ACCOUNT` or `ENDPOINT`).
+      - `databricks_mws_networks` (`vpc_endpoints` block): Binds registered VPC endpoints (`rest_api` and `dataplane_relay`) to the customer-managed VPC network configuration.
+      - `databricks_mws_workspaces` (`private_access_settings_id` attribute): Links Private Access Settings to the workspace instance.
+  - **Control Plane Private Connectivity Architecture (AWS PrivateLink)**:
+    - Ground all private connectivity designs in the [Databricks AWS PrivateLink Workspace Guide](https://registry.terraform.io/providers/databricks/databricks/latest/docs/guides/aws-private-link-workspace) and [Databricks Classic Private Connectivity Documentation](https://docs.databricks.com/aws/en/security/network/classic/privatelink).
+    - Maintain strict separation between AWS Cloud provider resources (`aws_vpc_endpoint`, dedicated VPC endpoint subnets, security groups) and Databricks Account MWS provider resources (`databricks_mws_vpc_endpoint`, `databricks_mws_private_access_settings`, `databricks_mws_networks`, `databricks_mws_workspaces`).
   - **Databricks AWS Workspace Provisioning Routing**:
     - For all workspace provisioning patterns, refer to the [`.ai/skills/databricks-aws-workspace/SKILL.md`](./skills/databricks-aws-workspace/SKILL.md) skill. Follow the strict separation rule between the workspace creation module (`provider = databricks.mws`) and downstream workspace management modules (`provider = databricks`).
   - **Never guess provider scopes**: Always check the official [Databricks Terraform Provider Documentation](https://registry.terraform.io/providers/databricks/databricks/latest/docs) to determine whether a resource operates at the account or workspace level.

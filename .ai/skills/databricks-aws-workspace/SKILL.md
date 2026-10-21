@@ -35,6 +35,12 @@ Every architectural decision, resource definition, and authentication scheme mus
 - **Databricks Hub & Spoke Firewall Architecture**:
   [AWS E2 Firewall Hub and Spoke Guide](https://github.com/databricks/terraform-provider-databricks/blob/main/docs/guides/aws-e2-firewall-hub-and-spoke.md)
   *Enterprise architecture reference for centralized egress filtering via AWS Network Firewall and AWS Transit Gateway.*
+- **Databricks AWS PrivateLink Workspace Terraform Guide**:
+  [Databricks AWS PrivateLink Workspace Guide](https://registry.terraform.io/providers/databricks/databricks/latest/docs/guides/aws-private-link-workspace)
+  *Imperative source of truth for provisioning Databricks and AWS resources needed for private connectivity between the data plane and control plane, including VPC endpoint registration (`databricks_mws_vpc_endpoint`), private access settings (`databricks_mws_private_access_settings`), customer-managed network VPC endpoint associations (`databricks_mws_networks`), and private workspace provisioning.*
+- **Databricks Classic PrivateLink & Control Plane Connectivity Guide**:
+  [Databricks Classic Private Connectivity Documentation](https://docs.databricks.com/aws/en/security/network/classic/privatelink)
+  *Imperative source of truth for configuring AWS PrivateLink for classic compute plane back-end private connectivity to Databricks control plane services, covering workspace REST API and secure cluster connectivity relay VPC endpoint requirements, private access settings, DNS configuration, and security isolation.*
 
 ---
 
@@ -374,20 +380,78 @@ resource "databricks_mws_customer_managed_keys" "storage" {
 
 ---
 
-### F. AWS PrivateLink Integration (Optional Enterprise Pattern)
+### F. AWS PrivateLink Integration for Control Plane Private Connectivity
 
-For enterprises requiring private transit between workspace users, data plane compute, and control plane:
+For enterprise deployments requiring private transit between compute clusters on the data plane and core services on the control plane, adhere strictly to the [Databricks AWS PrivateLink Workspace Guide](https://registry.terraform.io/providers/databricks/databricks/latest/docs/guides/aws-private-link-workspace) and [Databricks Classic Private Connectivity Documentation](https://docs.databricks.com/aws/en/security/network/classic/privatelink).
 
 ```hcl
-// Private access settings for the workspace
+// 1. AWS VPC Interface Endpoints for Databricks Control Plane Services
+resource "aws_vpc_endpoint" "backend_rest" {
+  count               = var.enable_privatelink ? 1 : 0
+  vpc_id              = var.spoke_vpc_id
+  service_name        = var.workspace_vpce_service // e.g. com.amazonaws.vpce.<region>.k8s-workspace
+  vpc_endpoint_type   = "Interface"
+  security_group_ids  = [aws_security_group.privatelink_sg[0].id]
+  subnet_ids          = var.privatelink_subnet_ids
+  private_dns_enabled = true
+  tags                = merge(var.tags, { Name = "${var.resource_prefix}-rest-vpce" })
+}
+
+resource "aws_vpc_endpoint" "backend_relay" {
+  count               = var.enable_privatelink ? 1 : 0
+  vpc_id              = var.spoke_vpc_id
+  service_name        = var.relay_vpce_service // e.g. com.amazonaws.vpce.<region>.k8s-tunnel
+  vpc_endpoint_type   = "Interface"
+  security_group_ids  = [aws_security_group.privatelink_sg[0].id]
+  subnet_ids          = var.privatelink_subnet_ids
+  private_dns_enabled = true
+  tags                = merge(var.tags, { Name = "${var.resource_prefix}-relay-vpce" })
+}
+
+// 2. Databricks Account MWS VPC Endpoint Registrations
+resource "databricks_mws_vpc_endpoint" "backend_rest" {
+  count               = var.enable_privatelink ? 1 : 0
+  provider            = databricks.mws
+  account_id          = var.databricks_account_id
+  aws_vpc_endpoint_id = aws_vpc_endpoint.backend_rest[0].id
+  vpc_endpoint_name   = "${var.resource_prefix}-vpce-backend-rest"
+  region              = var.aws_region
+}
+
+resource "databricks_mws_vpc_endpoint" "backend_relay" {
+  count               = var.enable_privatelink ? 1 : 0
+  provider            = databricks.mws
+  account_id          = var.databricks_account_id
+  aws_vpc_endpoint_id = aws_vpc_endpoint.backend_relay[0].id
+  vpc_endpoint_name   = "${var.resource_prefix}-vpce-backend-relay"
+  region              = var.aws_region
+}
+
+// 3. Databricks Account MWS Private Access Settings (PAS)
 resource "databricks_mws_private_access_settings" "pas" {
-  count                         = var.enable_privatelink ? 1 : 0
-  provider                      = databricks.mws
-  account_id                    = var.databricks_account_id
-  private_access_settings_name  = "${var.resource_prefix}-pas"
-  region                        = var.aws_region
-  public_access_enabled         = true
-  private_access_level          = "ACCOUNT"
+  count                        = var.enable_privatelink ? 1 : 0
+  provider                     = databricks.mws
+  account_id                   = var.databricks_account_id
+  private_access_settings_name = "${var.resource_prefix}-pas"
+  region                       = var.aws_region
+  public_access_enabled        = true
+  private_access_level         = "ACCOUNT"
+}
+
+// 4. Databricks MWS Customer-Managed Network with Attached VPC Endpoints
+resource "databricks_mws_networks" "privatelink_network" {
+  count              = var.enable_privatelink ? 1 : 0
+  provider           = databricks.mws
+  account_id         = var.databricks_account_id
+  network_name       = "${var.resource_prefix}-privatelink-network"
+  vpc_id             = var.spoke_vpc_id
+  subnet_ids         = var.spoke_private_subnet_ids
+  security_group_ids = [aws_security_group.spoke_sg.id]
+
+  vpc_endpoints {
+    rest_api        = [databricks_mws_vpc_endpoint.backend_rest[0].vpc_endpoint_id]
+    dataplane_relay = [databricks_mws_vpc_endpoint.backend_relay[0].vpc_endpoint_id]
+  }
 }
 ```
 

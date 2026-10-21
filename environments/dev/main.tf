@@ -2,12 +2,15 @@
   Databricks Multi-Workspace and Compute Orchestration - Dev Environment
   Documentation:
     - https://docs.databricks.com/aws/en/admin/workspace/
+    - https://docs.databricks.com/aws/en/security/network/classic/privatelink
+    - https://registry.terraform.io/providers/databricks/databricks/latest/docs/guides/aws-private-link-workspace
     - https://registry.terraform.io/providers/databricks/databricks/latest/docs
 
   Root module orchestrating multi-workspace provisioning and scoped compute governance:
     - S3 backend bucket & KMS key for state persistence.
     - Databricks Cross-Account IAM role with propagation safeguards.
-    - Databricks MWS Networking with AWS PrivateLink VPC endpoints.
+    - Databricks MWS Networking with AWS PrivateLink VPC endpoints (Workspace REST API and SCC Relay)
+      and Private Access Settings (PAS) resolved from Project 01 via AWS data sources.
     - Dedicated root storage S3 buckets encrypted with isolated customer-managed KMS keys.
     - Generic Databricks Workspaces for Data Engineering, Data Science, and Analytics personas.
     - Scoped compute policies (with max 25 DBU platform admin policy) and role-based permissions.
@@ -46,20 +49,23 @@ module "cross_account_role" {
   credentials_name      = local.credentials_name
 }
 
-/* 3. Databricks MWS Networking and PrivateLink */
+/* 3. Databricks MWS Networking and Control Plane PrivateLink */
 
 module "mws_networking" {
-  source = "../../modules/01.networking/006.databricks_mws_networking"
+  source = "../../modules/01.networking/001.databricks_mws_networking"
 
   providers = {
     databricks.mws = databricks.mws
   }
 
   databricks_account_id = var.databricks_account_id
+  aws_region            = var.aws_region
   network_name          = local.network_name
   vpc_id                = data.aws_vpc.spoke.id
   subnet_ids            = data.aws_subnets.spoke_compute.ids
   security_group_ids    = [data.aws_security_group.spoke_sg.id]
+  workspace_vpce_id     = data.aws_vpc_endpoint.databricks_workspace_rest.id
+  relay_vpce_id         = data.aws_vpc_endpoint.databricks_scc_relay.id
 }
 
 /* 4. Dedicated Customer-Managed KMS Keys per Workspace */
@@ -110,6 +116,7 @@ module "workspaces" {
   storage_configuration_id        = module.root_buckets[each.key].storage_configuration_id
   network_id                      = module.mws_networking.network_id
   storage_customer_managed_key_id = module.root_buckets[each.key].customer_managed_key_id
+  private_access_settings_id      = module.mws_networking.private_access_settings_id
   admin_group_name                = each.value.admin_group_name
   user_group_names                = each.value.user_group_names
 }

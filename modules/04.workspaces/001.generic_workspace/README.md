@@ -26,6 +26,7 @@
    - `storage_configuration_id`: S3 root storage bucket registered in MWS.
    - `network_id`: Customer-managed VPC registered in MWS.
    - `storage_customer_managed_key_id`: CMK registered in MWS for root storage encryption.
+   - `private_access_settings_id`: Private Access Settings (PAS) registered in MWS for AWS PrivateLink connectivity.
 2. **Platform Admin Assignment**: Executes `databricks_mws_permission_assignment.admins` granting the `ADMIN` role to `var.admin_group_name`.
 3. **User Group Assignment**: Executes `databricks_mws_permission_assignment.users` granting the `USER` role to `var.user_group_names`.
 4. **Outputs**: Exposes `workspace_url` for downstream compute orchestrators.
@@ -99,6 +100,7 @@ This module does not invoke external submodules. It provisions Databricks MWS wo
 | `storage_configuration_id` | `string` | Registered MWS storage configuration ID | Yes |
 | `network_id` | `string` | Registered MWS network ID | Yes |
 | `storage_customer_managed_key_id` | `string` | Registered MWS CMK ID for storage encryption | Yes |
+| `private_access_settings_id` | `string` | Registered MWS Private Access Settings (PAS) ID for PrivateLink connectivity | No |
 | `admin_group_name` | `string` | Platform administrator group name | No |
 | `user_group_names` | `list(string)` | List of user group names granted USER access | No |
 | `pricing_tier` | `string` | Pricing tier (`PREMIUM` or `ENTERPRISE`, default: `\"ENTERPRISE\"`) | No |

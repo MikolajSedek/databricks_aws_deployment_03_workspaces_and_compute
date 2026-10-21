@@ -27,7 +27,7 @@
 | <a name="module_compute_data_science"></a> [compute\_data\_science](#module\_compute\_data\_science) | ../../modules/05.compute/004.workspace_compute | n/a |
 | <a name="module_cross_account_role"></a> [cross\_account\_role](#module\_cross\_account\_role) | ../../modules/02.security/002.cross_account_role | n/a |
 | <a name="module_kms_key"></a> [kms\_key](#module\_kms\_key) | ../../modules/02.security/001.kms_key | n/a |
-| <a name="module_mws_networking"></a> [mws\_networking](#module\_mws\_networking) | ../../modules/01.networking/006.databricks_mws_networking | n/a |
+| <a name="module_mws_networking"></a> [mws\_networking](#module\_mws\_networking) | ../../modules/01.networking/001.databricks_mws_networking | n/a |
 | <a name="module_root_buckets"></a> [root\_buckets](#module\_root\_buckets) | ../../modules/03.storage/002.databricks_root_bucket | n/a |
 | <a name="module_workspace_kms_keys"></a> [workspace\_kms\_keys](#module\_workspace\_kms\_keys) | ../../modules/02.security/001.kms_key | n/a |
 | <a name="module_workspaces"></a> [workspaces](#module\_workspaces) | ../../modules/04.workspaces/001.generic_workspace | n/a |
@@ -39,6 +39,8 @@
 | [aws_security_group.spoke_sg](https://registry.terraform.io/providers/hashicorp/aws/6.66.0/docs/data-sources/security_group) | data source |
 | [aws_subnets.spoke_compute](https://registry.terraform.io/providers/hashicorp/aws/6.66.0/docs/data-sources/subnets) | data source |
 | [aws_vpc.spoke](https://registry.terraform.io/providers/hashicorp/aws/6.66.0/docs/data-sources/vpc) | data source |
+| [aws_vpc_endpoint.databricks_scc_relay](https://registry.terraform.io/providers/hashicorp/aws/6.66.0/docs/data-sources/vpc_endpoint) | data source |
+| [aws_vpc_endpoint.databricks_workspace_rest](https://registry.terraform.io/providers/hashicorp/aws/6.66.0/docs/data-sources/vpc_endpoint) | data source |
 | [databricks_group.data_analysts](https://registry.terraform.io/providers/databricks/databricks/1.135.0/docs/data-sources/group) | data source |
 | [databricks_group.data_engineers](https://registry.terraform.io/providers/databricks/databricks/1.135.0/docs/data-sources/group) | data source |
 | [databricks_group.data_scientists](https://registry.terraform.io/providers/databricks/databricks/1.135.0/docs/data-sources/group) | data source |
