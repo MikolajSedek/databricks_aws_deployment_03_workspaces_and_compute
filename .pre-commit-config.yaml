@@ -29,7 +29,6 @@ repos:
       - id: terraform_validate
         name: terraform_validate (modules)
         files: ^modules/
-        exclude: ^modules/(01\.networking/006\.databricks_mws_networking|02\.security/002\.cross_account_role|03\.storage/002\.databricks_root_bucket|04\.workspaces/001\.generic_workspace)/
         args:
           - --tf-init-args=-backend=false
           - --hook-config=--retry-once-with-cleanup=true
