@@ -1,0 +1,60 @@
+name: Deploy Dev Environment - Stage 2 (Compute & Governance)
+
+on:
+  push:
+    branches:
+      - '**'
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      auto_apply:
+        description: 'Auto-apply after plan approval (if GitHub Environment protection rules allow)'
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  id-token: write
+  pull-requests: write
+
+jobs:
+  # ============================================================================
+  # STEP 0: PRE-COMMIT QUALITY & SECURITY CHECKS
+  # ============================================================================
+  precommit:
+    name: Pre-commit Quality & Security Checks
+    uses: ./.github/workflows/dpl-01-precommit.yml
+    secrets: inherit
+
+  # ============================================================================
+  # STEP 1: STAGE 2 PLAN (WORKSPACE PLANE COMPUTE & GOVERNANCE)
+  # Full plan: evaluates compute policies, all-purpose clusters, and SQL warehouses
+  # against live workspace URLs generated in Stage 1.
+  # ============================================================================
+  plan_stage2:
+    name: Stage 2 Plan (Compute & Governance)
+    needs: [ precommit ]
+    uses: ./.github/workflows/dpl-04-plan-stage2.yml
+    secrets: inherit
+    with:
+      working_directory: 'environments/dev'
+      environment: 'dev'
+      plan_artifact_name: 'dev-stage2-tfplan'
+
+  # ============================================================================
+  # STEP 2: STAGE 2 APPLY (WORKSPACE PLANE COMPUTE & GOVERNANCE)
+  # Gated by GitHub Environment "dev" manual approval on main branch.
+  # ============================================================================
+  apply_stage2:
+    name: Stage 2 Apply (Compute & Governance)
+    needs: [ plan_stage2 ]
+    if: github.ref == 'refs/heads/main'
+    uses: ./.github/workflows/dpl-05-apply-stage2.yml
+    secrets: inherit
+    with:
+      working_directory: 'environments/dev'
+      environment: 'dev'
+      plan_artifact_name: 'dev-stage2-tfplan'

@@ -1,0 +1,104 @@
+name: Deploy Dev Environment (Two-Stage Pipeline)
+
+on:
+  push:
+    branches:
+      - '**'
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      stage:
+        description: 'Deployment Stage: "all" (both stages), "stage1" (foundation only), or "stage2" (compute only)'
+        required: true
+        type: choice
+        options:
+          - 'all'
+          - 'stage1'
+          - 'stage2'
+        default: 'all'
+      auto_apply:
+        description: 'Auto-apply after plan approval (if GitHub Environment protection rules allow)'
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  id-token: write
+  pull-requests: write
+
+jobs:
+  # ============================================================================
+  # STEP 0: PRE-COMMIT CHECKS
+  # Runs code formatting, linting (tflint), secret scanning (gitleaks), and security scanning (trivy).
+  # ============================================================================
+  precommit:
+    name: Pre-commit Quality & Security Checks
+    uses: ./.github/workflows/dpl-01-precommit.yml
+    secrets: inherit
+
+  # ============================================================================
+  # STAGE 1: FOUNDATION DEPLOYMENT (ACCOUNT PLANE)
+  # Provisions state backend, cross-account credentials, MWS network registration,
+  # customer-managed KMS keys, root storage buckets, and Databricks E2 workspaces.
+  # ============================================================================
+  stage1_plan:
+    name: Stage 1 Plan (Foundation)
+    needs: [ precommit ]
+    if: github.event_name != 'workflow_dispatch' || inputs.stage == 'all' || inputs.stage == 'stage1'
+    uses: ./.github/workflows/dpl-02-plan-stage1.yml
+    secrets: inherit
+    with:
+      working_directory: 'environments/dev'
+      environment: 'dev'
+      plan_artifact_name: 'dev-stage1-tfplan'
+
+  stage1_apply:
+    name: Stage 1 Apply (Foundation)
+    needs: [ stage1_plan ]
+    if: github.ref == 'refs/heads/main' && (github.event_name != 'workflow_dispatch' || inputs.stage == 'all' || inputs.stage == 'stage1')
+    uses: ./.github/workflows/dpl-03-apply-stage1.yml
+    secrets: inherit
+    with:
+      working_directory: 'environments/dev'
+      environment: 'dev'
+      plan_artifact_name: 'dev-stage1-tfplan'
+
+  # ============================================================================
+  # STAGE 2: COMPUTE & GOVERNANCE CONVERGENCE (WORKSPACE PLANE)
+  # Deploys cluster policies, policy-governed compute clusters, and SQL warehouses
+  # into initialized workspaces using live URLs resolved from Stage 1.
+  # ============================================================================
+  stage2_plan:
+    name: Stage 2 Plan (Compute & Governance)
+    needs: [ precommit, stage1_plan, stage1_apply ]
+    if: |
+      always() &&
+      needs.precommit.result == 'success' &&
+      !contains(needs.*.result, 'failure') &&
+      !contains(needs.*.result, 'cancelled') &&
+      (github.event_name != 'workflow_dispatch' || inputs.stage == 'all' || inputs.stage == 'stage2') &&
+      (
+        inputs.stage == 'stage2' ||
+        (github.ref == 'refs/heads/main' && needs.stage1_apply.result == 'success') ||
+        (github.ref != 'refs/heads/main' && needs.stage1_plan.result == 'success')
+      )
+    uses: ./.github/workflows/dpl-04-plan-stage2.yml
+    secrets: inherit
+    with:
+      working_directory: 'environments/dev'
+      environment: 'dev'
+      plan_artifact_name: 'dev-stage2-tfplan'
+
+  stage2_apply:
+    name: Stage 2 Apply (Compute & Governance)
+    needs: [ stage2_plan ]
+    if: github.ref == 'refs/heads/main' && (github.event_name != 'workflow_dispatch' || inputs.stage == 'all' || inputs.stage == 'stage2')
+    uses: ./.github/workflows/dpl-05-apply-stage2.yml
+    secrets: inherit
+    with:
+      working_directory: 'environments/dev'
+      environment: 'dev'
+      plan_artifact_name: 'dev-stage2-tfplan'
