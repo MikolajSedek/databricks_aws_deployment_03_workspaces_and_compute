@@ -121,8 +121,8 @@ graph TD
 | Workflow File | Trigger Type | Primary Role | Key Inputs / Defaults |
 |:---|:---:|:---|:---|
 | [`deploy-dev.yml`](./deploy-dev.yml) | `push`, `pull_request`, `workflow_dispatch` | Unified pipeline coordinating Stage 1 and Stage 2 sequentially | `stage: all` (`all`, `stage1`, `stage2`), `auto_apply: false` |
-| [`deploy-dev-stage1.yml`](./deploy-dev-stage1.yml) | `push`, `pull_request`, `workflow_dispatch` | Dedicated standalone run for Stage 1 (Foundation) | `auto_apply: false` |
-| [`deploy-dev-stage2.yml`](./deploy-dev-stage2.yml) | `push`, `pull_request`, `workflow_dispatch` | Dedicated standalone run for Stage 2 (Compute & Governance) | `auto_apply: false` |
+| [`deploy-dev-stage1.yml`](./deploy-dev-stage1.yml) | `workflow_dispatch` | Dedicated standalone run for Stage 1 (Foundation) | `auto_apply: false` |
+| [`deploy-dev-stage2.yml`](./deploy-dev-stage2.yml) | `workflow_dispatch` | Dedicated standalone run for Stage 2 (Compute & Governance) | `auto_apply: false` |
 | [`dpl-01-precommit.yml`](./dpl-01-precommit.yml) | `workflow_call` | Runs linting, syntax formatting, and multi-engine security scans | `terraform_version: 1.16.3`, `tflint_version: latest`, `trivy_version: latest` |
 | [`dpl-02-plan-stage1.yml`](./dpl-02-plan-stage1.yml) | `workflow_call` | Validates configuration, runs targeted Stage 1 `terraform plan`, and uploads artifact | `working_directory: environments/dev`, `environment: dev`, `plan_artifact_name: dev-stage1-tfplan` |
 | [`dpl-03-apply-stage1.yml`](./dpl-03-apply-stage1.yml) | `workflow_call` | Downloads Stage 1 plan artifact and executes `terraform apply` under environment gates | `working_directory: environments/dev`, `environment: dev`, `plan_artifact_name: dev-stage1-tfplan` |

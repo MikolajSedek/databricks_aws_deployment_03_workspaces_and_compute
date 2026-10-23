@@ -89,26 +89,8 @@ jobs:
           aws-region: ${{ env.AWS_REGION }}
           aws-profile: ${{ env.AWS_PROFILE }}
           overwrite-aws-profile: true
-
-      # Ensure shared config and credentials files match Go SDK expectations
-      - name: Ensure AWS Shared Profile Files
-        run: |
-          mkdir -p ~/.aws
-          cat << EOF > ~/.aws/config
-          [default]
-          region = ${{ env.AWS_REGION }}
-          output = json
-
-          [profile ${{ env.AWS_PROFILE }}]
-          region = ${{ env.AWS_REGION }}
-          output = json
-          EOF
-          if [ -n "${{ secrets.AWS_PROFILE_ROLE_ARN }}" ]; then
-            cat << EOF >> ~/.aws/config
-          role_arn = ${{ secrets.AWS_PROFILE_ROLE_ARN }}
-          source_profile = default
-          EOF
-          fi
+          role-to-assume: ${{ secrets.AWS_PROFILE_ROLE_ARN }}
+          role-skip-session-tagging: true
 
       # Restore cached Terraform plugins (.terraform directory)
       - name: Restore Terraform Providers Cache

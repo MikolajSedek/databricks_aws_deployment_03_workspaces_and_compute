@@ -96,7 +96,7 @@ permissions:
 ### 3.2 Dual-Cloud Authentication Guardrails
 
 #### AWS Authentication Pattern
-Always use `aws-actions/configure-aws-credentials` and write standard CLI profile configuration files to satisfy the AWS Go SDK and Terraform S3 backend:
+Always use `aws-actions/configure-aws-credentials` with `aws-profile` and `role-to-assume`. In version 6+, the action automatically writes both `~/.aws/credentials` and `~/.aws/config` matching AWS Go SDK expectations, completely eliminating the need for manual `mkdir` and `cat` scripts:
 
 ```yaml
 - name: Configure AWS Credentials
@@ -108,25 +108,8 @@ Always use `aws-actions/configure-aws-credentials` and write standard CLI profil
     aws-region: ${{ env.AWS_REGION }}
     aws-profile: ${{ env.AWS_PROFILE }}
     overwrite-aws-profile: true
-
-- name: Ensure AWS Shared Profile Files
-  run: |
-    mkdir -p ~/.aws
-    cat << EOF > ~/.aws/config
-    [default]
-    region = ${{ env.AWS_REGION }}
-    output = json
-
-    [profile ${{ env.AWS_PROFILE }}]
-    region = ${{ env.AWS_REGION }}
-    output = json
-    EOF
-    if [ -n "${{ secrets.AWS_PROFILE_ROLE_ARN }}" ]; then
-      cat << EOF >> ~/.aws/config
-    role_arn = ${{ secrets.AWS_PROFILE_ROLE_ARN }}
-    source_profile = default
-    EOF
-    fi
+    role-to-assume: ${{ secrets.AWS_PROFILE_ROLE_ARN }}
+    role-skip-session-tagging: true
 ```
 
 #### Databricks OAuth Service Principal Authentication Pattern
@@ -223,7 +206,7 @@ Always publish actionable plan results to `$GITHUB_STEP_SUMMARY` so reviewers ca
 |:---|:---|:---|
 | Running `terraform apply` without an existing `tfplan` | Evaluates dynamic values again, causing drift between review and apply | Plan with `-out=tfplan`, upload artifact, and run `terraform apply tfplan` |
 | Running `terraform-docs` during CI | Modifies `TERRAFORM.md` during CI, causing git diff or dirty workspace errors | Set `SKIP: 'terraform_docs,terraform-docs'` during CI pre-commit runs |
-| Blank `role_arn = ` in `~/.aws/config` | AWS Go SDK throws `SharedConfigEmptyRoleARNErr` | Conditionally append `role_arn` only if secret is non-empty |
+| Manual `mkdir -p ~/.aws && cat << EOF` file scripting | Redundant and prone to syntax/permission bugs; `aws-actions/configure-aws-credentials@v6` natively creates profile configs | Use `aws-actions/configure-aws-credentials@v6` with `aws-profile`, `role-to-assume`, and `role-skip-session-tagging: true` |
 | Single-stage apply on Databricks workspaces | Workspace-scoped provider fails with empty host during plan | Use Two-Stage Deployment (Stage 1 targets workspaces; Stage 2 converges compute) |
 | Hardcoding credentials in workflow files | Severe credential leak risk | Pass via `${{ secrets.* }}` into environment variables |
 | Allowing apply on unreviewed feature branches | Accidental resource modifications or outages | Restrict apply to `main` and gate behind GitHub Environment approvals |
