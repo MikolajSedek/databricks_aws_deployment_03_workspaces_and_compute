@@ -1,4 +1,4 @@
-name: Terraform Apply (Stage 1 - Foundation)
+name: Terraform Apply
 
 on:
   workflow_call:
@@ -32,7 +32,7 @@ on:
         description: 'Terraform plan artifact name'
         type: string
         required: false
-        default: 'dev-stage1-tfplan'
+        default: 'dev-tfplan'
 
 permissions:
   contents: read
@@ -40,8 +40,8 @@ permissions:
   pull-requests: write
 
 jobs:
-  apply_stage1:
-    name: Terraform Apply (Stage 1 - Foundation)
+  apply:
+    name: Terraform Apply
     runs-on: ubuntu-latest
     environment: ${{ inputs.environment }}
     defaults:
@@ -89,26 +89,8 @@ jobs:
           aws-region: ${{ env.AWS_REGION }}
           aws-profile: ${{ env.AWS_PROFILE }}
           overwrite-aws-profile: true
-
-      # Ensure shared config and credentials files match Go SDK expectations
-      - name: Ensure AWS Shared Profile Files
-        run: |
-          mkdir -p ~/.aws
-          cat << EOF > ~/.aws/config
-          [default]
-          region = ${{ env.AWS_REGION }}
-          output = json
-
-          [profile ${{ env.AWS_PROFILE }}]
-          region = ${{ env.AWS_REGION }}
-          output = json
-          EOF
-          if [ -n "${{ secrets.AWS_PROFILE_ROLE_ARN }}" ]; then
-            cat << EOF >> ~/.aws/config
-          role_arn = ${{ secrets.AWS_PROFILE_ROLE_ARN }}
-          source_profile = default
-          EOF
-          fi
+          role-to-assume: ${{ secrets.AWS_PROFILE_ROLE_ARN }}
+          role-skip-session-tagging: true
 
       # Restore cached Terraform plugins (.terraform directory)
       - name: Restore Terraform Providers Cache
@@ -120,17 +102,17 @@ jobs:
       - name: Terraform Init
         run: terraform init
 
-      # Download the cached Stage 1 plan file
-      - name: Download Cached Stage 1 Terraform Plan
+      # Download the cached plan file
+      - name: Download Cached Terraform Plan
         uses: actions/download-artifact@v8
         with:
           name: ${{ inputs.plan_artifact_name }}
           path: ${{ env.TF_WORKING_DIR }}
 
-      - name: Terraform Apply (Stage 1 - Foundation)
+      - name: Terraform Apply
         run: terraform apply -input=false -no-color tfplan
 
-      - name: Add Stage 1 Apply Summary to Job Summary
+      - name: Add Apply Summary to Job Summary
         run: |
-          echo "### Terraform Apply Completed Successfully (\`${{ inputs.environment }}\` - Stage 1: Foundation)" >> $GITHUB_STEP_SUMMARY
-          echo "Databricks E2 Workspaces and Foundation resources have been provisioned in AWS. Workspace URLs are now written to remote state." >> $GITHUB_STEP_SUMMARY
+          echo "### Terraform Apply Completed Successfully (\`${{ inputs.environment }}\`)" >> $GITHUB_STEP_SUMMARY
+          echo "Infrastructure, Databricks workspaces, cluster policies, compute clusters, and SQL warehouses have been provisioned." >> $GITHUB_STEP_SUMMARY

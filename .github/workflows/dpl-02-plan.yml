@@ -1,4 +1,4 @@
-name: Terraform Validate & Plan (Stage 2 - Compute & Governance)
+name: Terraform Validate & Plan
 
 on:
   workflow_call:
@@ -32,7 +32,7 @@ on:
         description: 'Terraform plan artifact name'
         type: string
         required: false
-        default: 'dev-stage2-tfplan'
+        default: 'dev-tfplan'
 
 permissions:
   contents: read
@@ -40,8 +40,8 @@ permissions:
   pull-requests: write
 
 jobs:
-  plan_stage2:
-    name: Terraform Validate & Plan (Stage 2 - Compute & Governance)
+  plan:
+    name: Terraform Validate & Plan
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -88,26 +88,8 @@ jobs:
           aws-region: ${{ env.AWS_REGION }}
           aws-profile: ${{ env.AWS_PROFILE }}
           overwrite-aws-profile: true
-
-      # Ensure shared config and credentials files match Go SDK expectations
-      - name: Ensure AWS Shared Profile Files
-        run: |
-          mkdir -p ~/.aws
-          cat << EOF > ~/.aws/config
-          [default]
-          region = ${{ env.AWS_REGION }}
-          output = json
-
-          [profile ${{ env.AWS_PROFILE }}]
-          region = ${{ env.AWS_REGION }}
-          output = json
-          EOF
-          if [ -n "${{ secrets.AWS_PROFILE_ROLE_ARN }}" ]; then
-            cat << EOF >> ~/.aws/config
-          role_arn = ${{ secrets.AWS_PROFILE_ROLE_ARN }}
-          source_profile = default
-          EOF
-          fi
+          role-to-assume: ${{ secrets.AWS_PROFILE_ROLE_ARN }}
+          role-skip-session-tagging: true
 
       # Cache Terraform plugins and providers (.terraform directory)
       - name: Cache Terraform Providers
@@ -127,16 +109,15 @@ jobs:
       - name: Terraform Validate
         run: terraform validate -no-color
 
-      # Stage 2 Full Plan: evaluates entire project including workspace-scoped compute modules
-      # (compute policies, all-purpose clusters, and SQL warehouses) using live URLs from Stage 1.
-      - name: Terraform Plan (Stage 2 - Compute & Governance)
+      # Speculative Execution Plan
+      - name: Terraform Plan
         id: plan
         run: |
           terraform plan -input=false -no-color -out=tfplan
           terraform show -no-color tfplan > tfplan.txt
 
-      # Upload and cache the Stage 2 binary plan file and text summary
-      - name: Cache & Save Stage 2 Plan Artifact
+      # Upload and cache the binary plan file and text summary
+      - name: Cache & Save Plan Artifact
         uses: actions/upload-artifact@v7
         with:
           name: ${{ inputs.plan_artifact_name }}
@@ -147,9 +128,9 @@ jobs:
           retention-days: 5
 
       # Attach plan summary to Job Summary
-      - name: Add Stage 2 Plan Summary to Job Summary
+      - name: Add Plan Summary to Job Summary
         run: |
-          echo "### Terraform Plan Summary (\`${{ inputs.environment }}\` - Stage 2: Compute & Governance)" >> $GITHUB_STEP_SUMMARY
+          echo "### Terraform Plan Summary (\`${{ inputs.environment }}\`)" >> $GITHUB_STEP_SUMMARY
           echo '```terraform' >> $GITHUB_STEP_SUMMARY
           cat tfplan.txt | tail -n 50 >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY

@@ -42,7 +42,7 @@ The provisioning lifecycle is structured across two planes: the **Account Plane*
 | `01_setup_vpc_networking` (`003.spoke_privatelink`) | SCC Relay VPC endpoint | `data.aws_vpc_endpoint.databricks_scc_relay` (`databricks-scc-relay-vpce-<env>`) |
 | `02_setup_identity_management` | Account groups | `data.databricks_group` for `dbx-platform-admins`, `dbx-data-engineers`, `dbx-data-scientists`, `dbx-data-analysts` |
 
-### 2.2 Two-Phase Provisioning Lifecycle
+### 2.2 Provisioning Lifecycle
 
 ```text
 Project 01 (Networking)                 Project 02 (Identities)
@@ -53,7 +53,7 @@ Project 01 (Networking)                 Project 02 (Identities)
                               |
                               v
  +----------------------------------------------------------------------+
- |                PHASE 1: FOUNDATION (Account Plane)                   |
+ |                    FOUNDATION (Account Plane)                        |
  |                                                                      |
  |  1. KMS CMK & S3 Remote State Backend (02.security, 03.storage)      |
  |  2. Cross-Account IAM Role & MWS Credentials (02.security)           |
@@ -64,7 +64,7 @@ Project 01 (Networking)                 Project 02 (Identities)
                               |
                               v  (Workspace URLs resolved)
  +----------------------------------------------------------------------+
- |             PHASE 2: COMPUTE GOVERNANCE (Workspace Plane)            |
+ |                 COMPUTE GOVERNANCE (Workspace Plane)                 |
  |                                                                      |
  |  Composite Module: 004.workspace_compute (instantiated per workspace)|
  |  |-- 001.compute_policies    -> Admin (<=25 DBU) & Shared (<=15 DBU) |
@@ -86,7 +86,7 @@ Project 01 (Networking)                 Project 02 (Identities)
 ```text
 03_workspaces_and_compute_management/
 ├── .ai/                                 # AI governance: instructions, README template, MCP config, skills
-├── .github/                             # Mirrored instructions, MCP config and skills
+├── .github/                             # GitHub Actions CI/CD workflows, copilot instructions, and skills
 ├── .pre-commit-config.yaml              # Pre-commit configuration (13 quality hooks)
 ├── .tflint.hcl                          # TFLint configuration with AWS and Terraform rulesets
 ├── .trivyignore                         # Trivy vulnerability and misconfiguration exemptions
@@ -200,7 +200,7 @@ flowchart TD
     classDef compute fill:#FFF3E0,stroke:#E65100,stroke-width:2px,color:#BF360C;
     classDef policy fill:#F3E5F5,stroke:#4A148C,stroke-width:2px,color:#311B92;
 
-    subgraph Phase1 ["Phase 1: Foundation (Account Plane)"]
+    subgraph FoundationPlane ["Foundation Architecture (Account Plane)"]
         KMS["<img src='https://raw.githubusercontent.com/mingrammer/diagrams/master/resources/aws/security/key-management-service.png' width='32' height='32' style='width:32px;height:32px;max-width:32px;max-height:32px;display:block;margin:0 auto;object-fit:contain;' /><br/><b>001.kms_key</b><br/>(KMS CMK)"]:::infra
         IAM["<img src='https://raw.githubusercontent.com/mingrammer/diagrams/master/resources/aws/security/identity-and-access-management-iam.png' width='32' height='32' style='width:32px;height:32px;max-width:32px;max-height:32px;display:block;margin:0 auto;object-fit:contain;' /><br/><b>002.cross_account_role</b><br/>(IAM Role + MWS Credentials)"]:::infra
         NET["<img src='https://raw.githubusercontent.com/mingrammer/diagrams/master/resources/aws/network/privatelink.png' width='32' height='32' style='width:32px;height:32px;max-width:32px;max-height:32px;display:block;margin:0 auto;object-fit:contain;' /><br/><b>001.databricks_mws_networking</b><br/>(VPCE Registration, PAS, Network)"]:::infra
@@ -213,7 +213,7 @@ flowchart TD
         S3 -->|"storage_configuration_id, CMK id"| WS
     end
 
-    subgraph Phase2 ["Phase 2: Compute Governance (Workspace Plane)"]
+    subgraph ComputePlane ["Compute Governance Architecture (Workspace Plane)"]
         subgraph CompositeCompute ["004.workspace_compute (per Persona Workspace)"]
             POL["<img src='https://raw.githubusercontent.com/oieduardorabelo/databricks-architecture-icons/main/icons/png/enterprise-security.png' width='28' height='28' style='width:28px;height:28px;max-width:28px;max-height:28px;display:block;margin:0 auto;object-fit:contain;' /><br/><b>001.compute_policies</b><br/>(Admin 25 DBU, Shared 15 DBU)"]:::policy
             CLS["<img src='https://raw.githubusercontent.com/oieduardorabelo/databricks-architecture-icons/main/icons/png/compute-clusters.png' width='36' height='36' style='width:36px;height:36px;max-width:36px;max-height:36px;display:block;margin:0 auto;object-fit:contain;' /><br/><b>002.all_purpose_cluster</b><br/>(Autoscaling Clusters)"]:::compute
@@ -223,7 +223,7 @@ flowchart TD
         end
     end
 
-    WS -->|"workspace_url"| Phase2
+    WS -->|"workspace_url"| ComputePlane
 ```
 
 ### 4.3 Level 3: Terraform Orchestration (`environments/dev`)
@@ -272,14 +272,14 @@ Every workspace deploys the capped **Platform Admin** policy alongside the **Wor
 | **Platform Admin Policy** | All Workspaces | **Max 25 DBUs/hr**, autoscale max 4 workers (default 2), max 45 min idle timeout (default 30), elastic disk fixed on, `PHOTON`/`STANDARD`, `USER_ISOLATION`/`SINGLE_USER` | `m5`, `m6i`, `c5`, `c6i`, `r5`, `r6i`, `i3`, `i4i` (`.xlarge`, `.2xlarge`); default `m5.xlarge` | `CAN_USE` for `dbx-platform-admins` |
 | **Workspace Shared Policy** | All Workspaces | **Max 15 DBUs/hr**, autoscale min fixed at 1, max 4 workers (default 2), max 30 min idle timeout (default 20), elastic disk fixed on, ML LTS runtimes allowed | Same allowlist as Platform Admin policy | `CAN_USE` for `dbx-platform-admins` & workspace user groups |
 | **Data Engineering Compute** | `data_engineering` | ETL cluster `de-etl-cluster-dev` (1–3 workers, `18.x-scala2.13`, 30 min idle) + SQL Warehouse `de-sql-warehouse-dev` (`2X-Small`, 15 min auto-stop) | `m5.xlarge` | Admin `CAN_MANAGE`; `dbx-data-engineers`: `CAN_RESTART` (cluster) / `CAN_USE` (warehouse) |
-| **Data Science Compute** | `data_science` | ML cluster `ds-ml-cluster-dev` (1–2 workers, `18.x-cpu-ml-scala2.13`, 20 min idle); no SQL Warehouses | `m5.xlarge` | Admin `CAN_MANAGE`; `dbx-data-scientists`: `CAN_RESTART` |
+| **Data Science Compute** | `data_science` | ML cluster `ds-ml-cluster-dev` (1–2 workers, `18.x-scala2.13`, 20 min idle); no SQL Warehouses | `m5.xlarge` | Admin `CAN_MANAGE`; `dbx-data-scientists`: `CAN_RESTART` |
 | **Data Analytics Compute** | `data_analytics` | BI SQL Warehouse `da-bi-warehouse-dev` (`X-Small`, 10 min auto-stop); no clusters | `X-Small` SQL Warehouse | Admin `CAN_MANAGE`; `dbx-data-analysts`: `CAN_USE` |
 
 ---
 
-## 6. Staged Deployment Runbook
+## 6. Deployment Runbook
 
-Workspace-scoped providers (`workspace_de`, `workspace_ds`, `workspace_da`) require live workspace URLs generated during workspace creation, so the initial deployment is a two-stage apply.
+The project is architected for unified single-pass plan and apply in either the local terminal or automated GitHub Actions CI/CD workflows.
 
 ### Prerequisites
 - AWS CLI profile with administrator privileges for the target account (`profile` variable; the S3 backend in [`backend.tf`](./environments/dev/backend.tf) uses its own profile).
@@ -287,28 +287,17 @@ Workspace-scoped providers (`workspace_de`, `workspace_ds`, `workspace_da`) requ
 - Projects `01_setup_vpc_networking` (Spoke VPC and PrivateLink endpoints) and `02_setup_identity_management` (account groups) already applied.
 - Terraform `>= 1.5.0` and the `uv` package manager installed.
 
-### Stage 1: Foundation Deployment (Account Plane)
-Provisions the state backend, cross-account credentials, MWS network registration, root storage, and creates the Databricks workspaces:
+### Execution Steps
 
 ```bash
 cd environments/dev
 terraform init
 
-terraform apply \
-  -target="module.kms_key" \
-  -target="module.backend_bucket" \
-  -target="module.cross_account_role" \
-  -target="module.mws_networking" \
-  -target="module.workspace_kms_keys" \
-  -target="module.root_buckets" \
-  -target="module.workspaces"
-```
+# 1. Speculative Execution Plan
+terraform plan -out=tfplan
 
-### Stage 2: Compute & Governance Convergence (Workspace Plane)
-Deploys cluster policies, policy-governed clusters, and SQL Warehouses into each initialized workspace:
-
-```bash
-terraform apply
+# 2. Infrastructure & Compute Apply
+terraform apply tfplan
 ```
 
 > [!CAUTION]
