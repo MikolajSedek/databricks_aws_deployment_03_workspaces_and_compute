@@ -1,4 +1,4 @@
-name: Terraform Apply (Stage 2 - Compute & Governance)
+name: Terraform Validate & Plan
 
 on:
   workflow_call:
@@ -32,7 +32,7 @@ on:
         description: 'Terraform plan artifact name'
         type: string
         required: false
-        default: 'dev-stage2-tfplan'
+        default: 'dev-tfplan'
 
 permissions:
   contents: read
@@ -40,10 +40,9 @@ permissions:
   pull-requests: write
 
 jobs:
-  apply_stage2:
-    name: Terraform Apply (Stage 2 - Compute & Governance)
+  plan:
+    name: Terraform Validate & Plan
     runs-on: ubuntu-latest
-    environment: ${{ inputs.environment }}
     defaults:
       run:
         working-directory: ${{ inputs.working_directory }}
@@ -92,27 +91,46 @@ jobs:
           role-to-assume: ${{ secrets.AWS_PROFILE_ROLE_ARN }}
           role-skip-session-tagging: true
 
-      # Restore cached Terraform plugins (.terraform directory)
-      - name: Restore Terraform Providers Cache
+      # Cache Terraform plugins and providers (.terraform directory)
+      - name: Cache Terraform Providers
         uses: actions/cache@v6
         with:
           path: ${{ env.TF_WORKING_DIR }}/.terraform
           key: terraform-${{ runner.os }}-${{ hashFiles(format('{0}/.terraform.lock.hcl', env.TF_WORKING_DIR)) }}
+          restore-keys: |
+            terraform-${{ runner.os }}-
+
+      - name: Terraform Format Check
+        run: terraform fmt -check -recursive
 
       - name: Terraform Init
         run: terraform init
 
-      # Download the cached Stage 2 plan file
-      - name: Download Cached Stage 2 Terraform Plan
-        uses: actions/download-artifact@v8
+      - name: Terraform Validate
+        run: terraform validate -no-color
+
+      # Speculative Execution Plan
+      - name: Terraform Plan
+        id: plan
+        run: |
+          terraform plan -input=false -no-color -out=tfplan
+          terraform show -no-color tfplan > tfplan.txt
+
+      # Upload and cache the binary plan file and text summary
+      - name: Cache & Save Plan Artifact
+        uses: actions/upload-artifact@v7
         with:
           name: ${{ inputs.plan_artifact_name }}
-          path: ${{ env.TF_WORKING_DIR }}
+          path: |
+            ${{ env.TF_WORKING_DIR }}/tfplan
+            ${{ env.TF_WORKING_DIR }}/tfplan.txt
+            ${{ env.TF_WORKING_DIR }}/.terraform.lock.hcl
+          retention-days: 5
 
-      - name: Terraform Apply (Stage 2 - Compute & Governance)
-        run: terraform apply -input=false -no-color tfplan
-
-      - name: Add Stage 2 Apply Summary to Job Summary
+      # Attach plan summary to Job Summary
+      - name: Add Plan Summary to Job Summary
         run: |
-          echo "### Terraform Apply Completed Successfully (\`${{ inputs.environment }}\` - Stage 2: Compute & Governance)" >> $GITHUB_STEP_SUMMARY
-          echo "Compute policies, all-purpose clusters, and SQL warehouses have been provisioned in the live Databricks workspaces." >> $GITHUB_STEP_SUMMARY
+          echo "### Terraform Plan Summary (\`${{ inputs.environment }}\`)" >> $GITHUB_STEP_SUMMARY
+          echo '```terraform' >> $GITHUB_STEP_SUMMARY
+          cat tfplan.txt | tail -n 50 >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY

@@ -1,19 +1,17 @@
 /*
-  Local Values and Multi-Workspace Configuration - Dev Environment
+  Local Values Configuration - Dev Environment
   Documentation:
     - https://developer.hashicorp.com/terraform/language/values/locals
-    - https://docs.databricks.com/aws/en/admin/workspace/
 
-  Defines declarative, structured maps of objects for provisioning:
-    - Backend state storage resources.
-    - Databricks Cross-Account IAM credentials and PrivateLink network parameters.
-    - Dedicated root storage buckets and customer-managed KMS keys per workspace.
-    - Databricks Workspaces for Data Engineering, Data Science, and Data Analytics personas.
-    - Scoped compute clusters, SQL warehouses, and cluster policy bindings supporting multiple instances.
+  Centralizes project metadata, naming conventions, and per-workspace specifications
+  for the dev environment:
+    - Naming convention: {owner}-{project_name}-{component}-{env}
+    - Persona workspaces: Data Engineering, Data Science, Data Analytics
+    - Workspace-scoped compute configurations (clusters and SQL Warehouses)
 */
 
 locals {
-  /* Basic Project Conventions */
+  /* Environment and Project Metadata */
   owner           = "msedek"
   env             = var.environment
   project_name    = "${local.owner}-dbx-dep"
@@ -21,7 +19,7 @@ locals {
 
   backend_bucket_name = "${local.project_name}-${local.subproject_name}-s3-backend"
 
-  /* Cross-Account Role & MWS Network Names */
+  /* Shared Foundation Resource Names */
   cross_account_role_name = "${local.project_name}-cross-account-role-${local.env}"
   credentials_name        = "${local.project_name}-credentials-${local.env}"
   network_name            = "${local.project_name}-mws-network-${local.env}"
@@ -78,7 +76,7 @@ locals {
       clusters = {
         ml_exploration = {
           cluster_name            = "ds-ml-cluster-${local.env}"
-          spark_version           = "18.x-cpu-ml-scala2.13"
+          spark_version           = "18.x-scala2.13"
           node_type_id            = "m5.xlarge"
           runtime_engine          = "STANDARD"
           data_security_mode      = "USER_ISOLATION"

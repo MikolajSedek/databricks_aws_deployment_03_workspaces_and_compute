@@ -12,7 +12,7 @@
 - **Purpose & Scope**:
   This environment orchestrates the complete end-to-end provisioning of dedicated Databricks workspaces and governed compute infrastructure for **Data Engineering**, **Data Science**, and **Data Analytics** personas in the `dev` environment. It builds on the networking foundation established in project `01_setup_vpc_networking` (customer-managed Spoke VPC, private compute subnets, cluster security group, and back-end PrivateLink endpoints) and the account identity governance established in project `02_setup_identity_management` (SCIM groups).
 - **Problem Statement & Solution**:
-  Deploying multiple Databricks workspaces in an enterprise environment requires orchestrating account-level resources (cross-account IAM roles, customer-managed VPC network registration, S3 root storage, KMS customer-managed keys) before workspace-level compute engines can be launched. This environment solves this dependency sequencing by separating deployment into an account-level foundation phase and a workspace-level compute governance phase.
+  Deploying multiple Databricks workspaces in an enterprise environment requires orchestrating account-level resources (cross-account IAM roles, customer-managed VPC network registration, S3 root storage, KMS customer-managed keys) alongside workspace-level compute engines. This environment delivers a clean, modular design orchestrating foundational AWS/Databricks MWS resources, persona workspaces, and compute governance within a unified, reproducible configuration.
 - **Key Business & Security Outcomes**:
   - **AWS & Account Foundation**: Dedicated cross-account IAM role with AWS STS propagation protection (`time_sleep` 30s), registration of the customer-managed Spoke VPC and PrivateLink endpoints in Databricks MWS, and encrypted state persistence.
   - **Isolated Storage**: Dedicated Amazon S3 root storage buckets per workspace, each encrypted with an independent customer-managed KMS key (annual rotation) and registered with Databricks MWS.
@@ -32,7 +32,7 @@ Project 02 (Account Groups)                ──>  Databricks Data Lookups (dat
                                                         │
                                                         ▼
          ┌──────────────────────────────────────────────────────────────┐
-         │              Phase 1: Foundation (Account Plane)             │
+         │              Foundation Layer (Account Plane)                │
          │  - S3 Backend & KMS Key                                      │
          │  - Cross-Account IAM Role (with 30s sleep)                   │
          │  - Customer-Managed Spoke VPC Network & PAS in MWS           │
@@ -42,7 +42,7 @@ Project 02 (Account Groups)                ──>  Databricks Data Lookups (dat
                                         │ (Workspace URLs Generated)
                                         ▼
          ┌──────────────────────────────────────────────────────────────┐
-         │              Phase 2: Compute Governance (Workspace Plane)   │
+         │         Compute Governance Layer (Workspace Plane)           │
          │  Composite Module: 004.workspace_compute (Instantiated 3x)   │
          │  - Compute Policies (Admin <=25 DBU & Shared <=15 DBU)       │
          │  - All-Purpose Compute Clusters (tied to policy IDs)         │
@@ -134,7 +134,7 @@ flowchart TD
     classDef policy fill:#F3E5F5,stroke:#4A148C,stroke-width:2px,color:#311B92;
 
     subgraph DevEnv ["environments/dev"]
-        subgraph Stage1Modules ["Stage 1: Foundation Modules"]
+        subgraph FoundationModules ["Foundation Modules (Account Plane)"]
             KmsKey["<img src='https://raw.githubusercontent.com/mingrammer/diagrams/master/resources/aws/security/key-management-service.png' width='28' height='28' style='width:28px;height:28px;max-width:28px;max-height:28px;display:block;margin:0 auto;object-fit:contain;' /><br/><b>001.kms_key</b>"]:::infra
             CrossAccount["<img src='https://raw.githubusercontent.com/mingrammer/diagrams/master/resources/aws/security/identity-and-access-management-iam.png' width='28' height='28' style='width:28px;height:28px;max-width:28px;max-height:28px;display:block;margin:0 auto;object-fit:contain;' /><br/><b>002.cross_account_role</b>"]:::infra
             Networking["<img src='https://raw.githubusercontent.com/mingrammer/diagrams/master/resources/aws/network/privatelink.png' width='28' height='28' style='width:28px;height:28px;max-width:28px;max-height:28px;display:block;margin:0 auto;object-fit:contain;' /><br/><b>001.databricks_mws_networking</b>"]:::infra
@@ -142,7 +142,7 @@ flowchart TD
             WorkspacesMod["<img src='https://raw.githubusercontent.com/oieduardorabelo/databricks-architecture-icons/main/icons/png/workspace.png' width='28' height='28' style='width:28px;height:28px;max-width:28px;max-height:28px;display:block;margin:0 auto;object-fit:contain;' /><br/><b>001.generic_workspace (3x)</b>"]:::infra
         end
 
-        subgraph Stage2Modules ["Stage 2: Compute Governance Modules"]
+        subgraph ComputeModules ["Compute Governance Modules (Workspace Plane)"]
             subgraph CompositeCompute ["004.workspace_compute (Instantiated 3x)"]
                 Policies["<img src='https://raw.githubusercontent.com/oieduardorabelo/databricks-architecture-icons/main/icons/png/enterprise-security.png' width='28' height='28' style='width:28px;height:28px;max-width:28px;max-height:28px;display:block;margin:0 auto;object-fit:contain;' /><br/><b>001.compute_policies</b>"]:::policy
                 Clusters["<img src='https://raw.githubusercontent.com/oieduardorabelo/databricks-architecture-icons/main/icons/png/compute-clusters.png' width='28' height='28' style='width:28px;height:28px;max-width:28px;max-height:28px;display:block;margin:0 auto;object-fit:contain;' /><br/><b>002.all_purpose_cluster</b>"]:::compute
@@ -159,30 +159,19 @@ flowchart TD
 
 ---
 
-## 5. Provisioning Sequence & Staged Rollout
+## 5. Provisioning Sequence & Deployment Runbook
 
-Because workspace-scoped providers require live workspace URLs determined during workspace creation, initial deployment follows a two-stage apply sequence:
-
-### Stage 1: Foundation Deployment (Account Plane)
-Provisions the state backend, cross-account credentials, customer-managed VPC network registration, root storage, and creates the Databricks workspaces:
+The environment is architected for unified single-pass plan and apply in either the local terminal or automated GitHub Actions CI/CD workflows:
 
 ```bash
+# Initialize Terraform and provider plugins
 terraform init
-terraform apply \
-  -target="module.kms_key" \
-  -target="module.backend_bucket" \
-  -target="module.cross_account_role" \
-  -target="module.mws_networking" \
-  -target="module.workspace_kms_keys" \
-  -target="module.root_buckets" \
-  -target="module.workspaces"
-```
 
-### Stage 2: Compute & Policies Convergence (Workspace Plane)
-Deploys the scoped cluster policies, compute clusters, SQL Warehouses, and object access control lists:
+# Speculative Execution Plan
+terraform plan -out=tfplan
 
-```bash
-terraform apply
+# Apply Infrastructure and Compute Governance
+terraform apply tfplan
 ```
 
 ---
@@ -196,7 +185,7 @@ All workspaces deploy the capped **Platform Admin** policy alongside the **Works
 | **Platform Admin Policy** | All Workspaces | **Max 25 DBUs/hr budget cap**, max 4 workers, cost-efficient instance types (`m5.xlarge`, `m5.2xlarge`, `c5.xlarge`, `c5.2xlarge`, `r5.xlarge`, `r5.2xlarge`, `i3.xlarge`, etc.), max 45 min idle timeout | `CAN_USE` for `dbx-platform-admins` |
 | **Workspace Shared Policy** | All Workspaces | **Max 15 DBUs/hr budget cap**, auto-scaling 1–4 workers, max 30 min idle timeout | `CAN_USE` for `dbx-platform-admins` & workspace user groups |
 | **Data Engineering Compute** | `data_engineering` | ETL cluster (`de-etl-cluster-dev`, 1–3 workers, `m5.xlarge`, `18.x-scala2.13`, 30 min idle timeout) + SQL Warehouse (`de-sql-warehouse-dev`, `2X-Small`, 15 min auto-stop) | `CAN_RESTART`/`CAN_USE` for `dbx-data-engineers` |
-| **Data Science Compute** | `data_science` | ML cluster (`ds-ml-cluster-dev`, 1–2 workers, `m5.xlarge`, ML runtime `18.x-cpu-ml-scala2.13`, 20 min idle timeout) | `CAN_RESTART` for `dbx-data-scientists` |
+| **Data Science Compute** | `data_science` | ML cluster (`ds-ml-cluster-dev`, 1–2 workers, `m5.xlarge`, `18.x-scala2.13`, 20 min idle timeout) | `CAN_RESTART` for `dbx-data-scientists` |
 | **Data Analytics Compute** | `data_analytics` | BI SQL Warehouse (`da-bi-warehouse-dev`, `X-Small`, 10 min auto-stop) | `CAN_USE` for `dbx-data-analysts` |
 
 ---

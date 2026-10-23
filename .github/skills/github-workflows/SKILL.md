@@ -50,14 +50,10 @@ Separate concerns by decomposing pipelines into reusable sub-workflows (`workflo
 
 ```
 .github/workflows/
-├── deploy-dev.yml              # Root Orchestrator (Coordinates stages for 'dev')
-├── deploy-dev-stage1.yml       # Standalone Orchestrator (Stage 1 only)
-├── deploy-dev-stage2.yml       # Standalone Orchestrator (Stage 2 only)
+├── deploy-dev.yml              # Root Orchestrator (Coordinates CI/CD for 'dev')
 ├── dpl-01-precommit.yml        # Reusable: Linting, hygiene, security scanning
-├── dpl-02-plan-stage1.yml      # Reusable: Targeted foundation plan
-├── dpl-03-apply-stage1.yml     # Reusable: Environment-gated foundation apply
-├── dpl-04-plan-stage2.yml      # Reusable: Full workspace compute plan
-├── dpl-05-apply-stage2.yml     # Reusable: Environment-gated compute apply
+├── dpl-02-plan.yml             # Reusable: Speculative execution plan and artifact generation
+├── dpl-03-apply.yml            # Reusable: Environment-gated deployment apply
 └── README.md                   # Comprehensive pipeline documentation
 ```
 
@@ -74,10 +70,10 @@ Never run `terraform plan` or cloud API calls before code passes static analysis
 - **Apply Strictly Gated on `main`**: Restrict `terraform apply` executions solely to the default branch (`main`) or explicit authorized dispatches.
 - **Plan Immutability**: Always store the speculative execution plan as an encrypted binary artifact (`tfplan` via `actions/upload-artifact`). The apply job must download and execute this exact binary file without re-evaluating interpolations (`terraform apply tfplan`).
 
-### 2.4 Two-Stage Deployment Pattern (Handling Provider Dependencies)
-When Terraform provider blocks depend on resource outputs created in the same root module (e.g. Databricks workspace-scoped providers depending on `module.workspaces["..."].workspace_url`):
-- **Stage 1 (Account Plane Foundation)**: Plan and apply with explicit `-target` flags for backend storage, IAM roles, networking, and workspace resources.
-- **Stage 2 (Workspace Plane Compute & Governance)**: Plan and apply the full project, which connects to the live workspace URLs stored in the remote state.
+### 2.4 Unified Plan and Apply Deployment Pattern
+The infrastructure architecture provisions the complete multi-workspace and compute governance platform in a single pipeline pass:
+- **Speculative Plan**: Generates an immutable binary execution plan (`tfplan`) capturing all foundation resources and workspace compute workloads.
+- **Gated Apply**: Executes `terraform apply tfplan` without re-evaluating interpolations, strictly guarded by GitHub Environment approvals.
 
 ---
 
@@ -141,8 +137,7 @@ jobs:
 
 To keep CI/CD execution times fast and predictable, implement 4-layer caching:
 
-### Layer 1: Python & Pre-commit (`astral-sh/setup-uv`)
-```yaml
+### Layer 1: Python & Pre-commit (`astral-sh/setup-uv`)\n```yaml
 - name: Setup uv
   uses: astral-sh/setup-uv@v9.0.0
   with:
@@ -192,7 +187,7 @@ Always publish actionable plan results to `$GITHUB_STEP_SUMMARY` so reviewers ca
 ```yaml
 - name: Add Plan Summary to Job Summary
   run: |
-    echo "### Terraform Plan Summary (\`${{ inputs.environment }}\` - ${{ inputs.stage_name }})" >> $GITHUB_STEP_SUMMARY
+    echo "### Terraform Plan Summary (\`${{ inputs.environment }}\`)" >> $GITHUB_STEP_SUMMARY
     echo '```terraform' >> $GITHUB_STEP_SUMMARY
     cat tfplan.txt | tail -n 50 >> $GITHUB_STEP_SUMMARY
     echo '```' >> $GITHUB_STEP_SUMMARY
@@ -207,6 +202,6 @@ Always publish actionable plan results to `$GITHUB_STEP_SUMMARY` so reviewers ca
 | Running `terraform apply` without an existing `tfplan` | Evaluates dynamic values again, causing drift between review and apply | Plan with `-out=tfplan`, upload artifact, and run `terraform apply tfplan` |
 | Running `terraform-docs` during CI | Modifies `TERRAFORM.md` during CI, causing git diff or dirty workspace errors | Set `SKIP: 'terraform_docs,terraform-docs'` during CI pre-commit runs |
 | Manual `mkdir -p ~/.aws && cat << EOF` file scripting | Redundant and prone to syntax/permission bugs; `aws-actions/configure-aws-credentials@v6` natively creates profile configs | Use `aws-actions/configure-aws-credentials@v6` with `aws-profile`, `role-to-assume`, and `role-skip-session-tagging: true` |
-| Single-stage apply on Databricks workspaces | Workspace-scoped provider fails with empty host during plan | Use Two-Stage Deployment (Stage 1 targets workspaces; Stage 2 converges compute) |
+| Unverified or ad-hoc target applies | Can leave dependent resources half-provisioned and drift state | Deploy complete configuration with unified plan and apply |
 | Hardcoding credentials in workflow files | Severe credential leak risk | Pass via `${{ secrets.* }}` into environment variables |
 | Allowing apply on unreviewed feature branches | Accidental resource modifications or outages | Restrict apply to `main` and gate behind GitHub Environment approvals |
